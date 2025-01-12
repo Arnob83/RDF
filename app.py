@@ -134,7 +134,7 @@ def main():
     CoapplicantIncome = st.number_input("Co-applicant's yearly Income", min_value=0.0)
     Loan_Amount_Term = st.number_input("Loan Term (in months)", min_value=0.0)
 
-    iif st.button("Predict"):
+    if st.button("Predict"):
     # Directly convert Credit_History based on user input
     Credit_History = 0 if Credit_History == "Unclear Debts" else 1
 
