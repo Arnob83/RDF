@@ -77,7 +77,6 @@ def save_to_database(gender, married, dependents, self_employed, loan_amount, pr
     conn.close()
 
 # Prediction function
-# Updated prediction function
 @st.cache_data
 def prediction(input_data, _model, _scaler):
     # Apply feature scaling
@@ -93,38 +92,18 @@ def prediction(input_data, _model, _scaler):
     pred_label = 'Approved' if prediction[0] == 1 else 'Rejected'
     return pred_label
 
+# Explain prediction
 def explain_prediction(input_data, model, final_result):
-    # Initialize SHAP TreeExplainer
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(input_data)
-
-    # Extract SHAP values for the input instance
     shap_values_for_input = shap_values[0]
 
-    # Get feature names
     feature_names = input_data.columns
-
-    # Generate explanation text
-    explanation_text = f"**Why your loan is {final_result}:**\n\n"
-    for feature, shap_value in zip(feature_names, shap_values_for_input):
-        # Convert shap_value to a scalar if it's an array
-        shap_scalar = shap_value[0] if isinstance(shap_value, np.ndarray) else shap_value
-        explanation_text += (
-            f"- **{feature}**: {'Positive' if shap_scalar > 0 else 'Negative'} contribution with a SHAP value of {shap_scalar:.2f}\n"
-        )
-
-    if final_result == 'Rejected':
-        explanation_text += "\nThe loan was rejected because the negative contributions outweighed the positive ones."
-    else:
-        explanation_text += "\nThe loan was approved because the positive contributions outweighed the negative ones."
-
-    # Fix for the bar plot: Use scalar SHAP values
     shap_values_for_plot = [
         shap_value[0] if isinstance(shap_value, np.ndarray) else shap_value
         for shap_value in shap_values_for_input
     ]
 
-    # Create bar plot for SHAP values
     plt.figure(figsize=(8, 5))
     plt.barh(feature_names, shap_values_for_plot, color=["green" if val > 0 else "red" for val in shap_values_for_plot])
     plt.xlabel("SHAP Value (Impact on Prediction)")
@@ -132,23 +111,17 @@ def explain_prediction(input_data, model, final_result):
     plt.title("Feature Contributions to Prediction")
     plt.tight_layout()
 
-    return explanation_text, plt
-
-
+    return plt
 
 # Main Streamlit app
 def main():
-    # Initialize database
     init_db()
 
-    # App layout
     st.title("Loan Prediction ML App")
 
-    # Define mappings for target-encoded features
     dependents_mapping = {'0': 0.6861, '1': 0.6471, '2': 0.7525, '3+': 0.6471}
     property_area_mapping = {'Rural': 0.6145, 'Semiurban': 0.7682, 'Urban': 0.6584}
 
-    # User inputs
     Gender = st.selectbox("Gender", ("Male", "Female"))
     Married = st.selectbox("Married", ("Yes", "No"))
     Dependents = st.selectbox("Dependents", ('0', '1', '2', '3+'))
@@ -162,12 +135,10 @@ def main():
     Loan_Amount_Term = st.number_input("Loan Term (in months)", min_value=0.0)
 
     if st.button("Predict"):
-        # Map inputs to encoded values
         Property_Area_encoded = property_area_mapping[Property_Area]
-        Credit_History_encoded = 0.0 if Credit_History == "Unclear Debts" else 1.0
+        Credit_History_encoded = 0 if Credit_History == "Unclear Debts" else 1
         Dependents_encoded = dependents_mapping[Dependents]
 
-        # Prepare input data for prediction
         input_data = pd.DataFrame([{
             "Credit_History": Credit_History_encoded,
             "Education": 1 if Education == "Graduate" else 0,
@@ -178,44 +149,17 @@ def main():
             "Dependents": Dependents_encoded
         }])
 
-        # Prediction
         result = prediction(input_data, model, scaler)
 
-        # Save to database
         save_to_database(Gender, Married, Dependents, Self_Employed, Loan_Amount, Property_Area, 
                          Credit_History, Education, ApplicantIncome, CoapplicantIncome, 
                          Loan_Amount_Term, result)
 
-        # Display result
         st.success(f"Loan Prediction: {result}")
 
-      # Explain the prediction
         st.header("Explanation of Prediction")
-        explanation_text, bar_chart = explain_prediction(input_data, model, final_result=result)
-
-        st.write(explanation_text)
+        bar_chart = explain_prediction(input_data, model, final_result=result)
         st.pyplot(bar_chart)
-
-
-    # View database
-    if st.button("View Database"):
-        conn = sqlite3.connect("loan_data.db")
-        df = pd.read_sql_query("SELECT * FROM loan_predictions", conn)
-        st.write(df)
-        conn.close()
-
-    # Download database button
-    if st.button("Download Database"):
-        if os.path.exists("loan_data.db"):
-            with open("loan_data.db", "rb") as f:
-                st.download_button(
-                    label="Download SQLite Database",
-                    data=f,
-                    file_name="loan_data.db",
-                    mime="application/octet-stream"
-                )
-        else:
-            st.error("Database file not found.")
 
 if __name__ == '__main__':
     main()
