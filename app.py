@@ -172,7 +172,7 @@ def main():
 
       # Explain the prediction
         st.header("Explanation of Prediction")
-        explanation_text, bar_chart = explain_prediction(input_data, final_result=result)
+        explanation_text, bar_chart = explain_prediction(input_data, model, final_result=result)
         st.write(explanation_text)
         st.pyplot(bar_chart)
 
