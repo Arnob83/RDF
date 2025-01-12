@@ -83,32 +83,18 @@ def prediction(input_data, _model, _scaler):
     columns_to_scale = ['ApplicantIncome', 'CoapplicantIncome', 'Loan_Amount_Term']
     input_data[columns_to_scale] = _scaler.transform(input_data[columns_to_scale])
 
-    # Ensure input data is ordered according to model feature order
-    feature_order = _model.feature_names_in_
-    input_data = input_data[feature_order]
-
     # Model prediction (0 = Rejected, 1 = Approved)
     prediction = _model.predict(input_data)
     pred_label = 'Approved' if prediction[0] == 1 else 'Rejected'
     return pred_label
 
 # Explain prediction
-def explain_prediction(input_data, model, final_result):
+def explain_prediction(input_data, model):
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(input_data)
-    shap_values_for_input = shap_values[0]
-
-    feature_names = input_data.columns
-    shap_values_for_plot = [
-        shap_value[0] if isinstance(shap_value, np.ndarray) else shap_value
-        for shap_value in shap_values_for_input
-    ]
 
     plt.figure(figsize=(8, 5))
-    plt.barh(feature_names, shap_values_for_plot, color=["green" if val > 0 else "red" for val in shap_values_for_plot])
-    plt.xlabel("SHAP Value (Impact on Prediction)")
-    plt.ylabel("Features")
-    plt.title("Feature Contributions to Prediction")
+    shap.summary_plot(shap_values, input_data)
     plt.tight_layout()
 
     return plt
@@ -133,42 +119,42 @@ def main():
     ApplicantIncome = st.number_input("Applicant's yearly Income", min_value=0.0)
     CoapplicantIncome = st.number_input("Co-applicant's yearly Income", min_value=0.0)
     Loan_Amount_Term = st.number_input("Loan Term (in months)", min_value=0.0)
-if st.button("Predict"):
-    # Directly convert Credit_History based on user input
-    Credit_History = 0 if Credit_History == "Unclear Debts" else 1
 
-    # Encode other features
-    Property_Area_encoded = property_area_mapping[Property_Area]
-    Dependents_encoded = dependents_mapping[Dependents]
+    if st.button("Predict"):
+        # Directly convert Credit_History based on user input
+        Credit_History = 0 if Credit_History == "Unclear Debts" else 1
 
-    # Prepare input data for prediction
-    input_data = pd.DataFrame([{
-        "Credit_History": Credit_History,  # Directly use the conditional value
-        "Education": 1 if Education == "Graduate" else 0,
-        "ApplicantIncome": ApplicantIncome,
-        "CoapplicantIncome": CoapplicantIncome,
-        "Loan_Amount_Term": Loan_Amount_Term,
-        "Property_Area": Property_Area_encoded,
-        "Dependents": Dependents_encoded
-    }])
+        # Encode other features
+        Property_Area_encoded = property_area_mapping[Property_Area]
+        Dependents_encoded = dependents_mapping[Dependents]
 
-    # Prediction
-    result = prediction(input_data, model, scaler)
+        # Prepare input data for prediction
+        input_data = pd.DataFrame([{
+            "Credit_History": Credit_History,
+            "Education": 1 if Education == "Graduate" else 0,
+            "ApplicantIncome": ApplicantIncome,
+            "CoapplicantIncome": CoapplicantIncome,
+            "Loan_Amount_Term": Loan_Amount_Term,
+            "Property_Area": Property_Area_encoded,
+            "Dependents": Dependents_encoded,
+            "LoanAmount": Loan_Amount
+        }])
 
-    # Save to database
-    save_to_database(Gender, Married, Dependents, Self_Employed, Loan_Amount, Property_Area, 
-                     Credit_History, Education, ApplicantIncome, CoapplicantIncome, 
-                     Loan_Amount_Term, result)
+        # Prediction
+        result = prediction(input_data, model, scaler)
 
-    # Display result
-    st.success(f"Loan Prediction: {result}")
+        # Save to database
+        save_to_database(Gender, Married, Dependents, Self_Employed, Loan_Amount, Property_Area, 
+                         Credit_History, Education, ApplicantIncome, CoapplicantIncome, 
+                         Loan_Amount_Term, result)
 
-    # Explain the prediction
-    st.header("Explanation of Prediction")
-    bar_chart = explain_prediction(input_data, model, final_result=result)
-    st.pyplot(bar_chart)
+        # Display result
+        st.success(f"Loan Prediction: {result}")
 
-
+        # Explain the prediction
+        st.header("Explanation of Prediction")
+        bar_chart = explain_prediction(input_data, model)
+        st.pyplot(bar_chart)
 
 if __name__ == '__main__':
     main()
