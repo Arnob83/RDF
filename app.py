@@ -94,27 +94,37 @@ def prediction(input_data, _model, _scaler):
     return pred_label
 
 def explain_prediction(input_data, model, final_result):
+    # Initialize SHAP TreeExplainer
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(input_data)
+
+    # Extract SHAP values for the input instance
     shap_values_for_input = shap_values[0]
 
+    # Get feature names
     feature_names = input_data.columns
+
+    # Generate explanation text
     explanation_text = f"**Why your loan is {final_result}:**\n\n"
     for feature, shap_value in zip(feature_names, shap_values_for_input):
+        # Use `.item()` to handle scalar values
         explanation_text += (
-            f"- **{feature}**: {'Positive' if shap_value > 0 else 'Negative'} contribution with a SHAP value of {shap_value:.2f}\n"
+            f"- **{feature}**: {'Positive' if shap_value.item() > 0 else 'Negative'} contribution with a SHAP value of {shap_value:.2f}\n"
         )
+
     if final_result == 'Rejected':
         explanation_text += "\nThe loan was rejected because the negative contributions outweighed the positive ones."
     else:
         explanation_text += "\nThe loan was approved because the positive contributions outweighed the negative ones."
 
+    # Create bar plot for SHAP values
     plt.figure(figsize=(8, 5))
     plt.barh(feature_names, shap_values_for_input, color=["green" if val > 0 else "red" for val in shap_values_for_input])
     plt.xlabel("SHAP Value (Impact on Prediction)")
     plt.ylabel("Features")
     plt.title("Feature Contributions to Prediction")
     plt.tight_layout()
+
     return explanation_text, plt
 
 # Main Streamlit app
@@ -173,6 +183,7 @@ def main():
       # Explain the prediction
         st.header("Explanation of Prediction")
         explanation_text, bar_chart = explain_prediction(input_data, model, final_result=result)
+
         st.write(explanation_text)
         st.pyplot(bar_chart)
 
