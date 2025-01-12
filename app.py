@@ -133,8 +133,7 @@ def main():
     ApplicantIncome = st.number_input("Applicant's yearly Income", min_value=0.0)
     CoapplicantIncome = st.number_input("Co-applicant's yearly Income", min_value=0.0)
     Loan_Amount_Term = st.number_input("Loan Term (in months)", min_value=0.0)
-
-    if st.button("Predict"):
+if st.button("Predict"):
     # Directly convert Credit_History based on user input
     Credit_History = 0 if Credit_History == "Unclear Debts" else 1
 
@@ -168,6 +167,7 @@ def main():
     st.header("Explanation of Prediction")
     bar_chart = explain_prediction(input_data, model, final_result=result)
     st.pyplot(bar_chart)
+
 
 
 if __name__ == '__main__':
