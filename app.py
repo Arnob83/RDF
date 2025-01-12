@@ -121,40 +121,40 @@ def main():
     Loan_Amount_Term = st.number_input("Loan Term (in months)", min_value=0.0)
 
     if st.button("Predict"):
-        # Directly convert Credit_History based on user input
-        Credit_History = 0 if Credit_History == "Unclear Debts" else 1
+    # Directly convert Credit_History based on user input
+    Credit_History = 0 if Credit_History == "Unclear Debts" else 1
 
-        # Encode other features
-        Property_Area_encoded = property_area_mapping[Property_Area]
-        Dependents_encoded = dependents_mapping[Dependents]
+    # Encode other features
+    Property_Area_encoded = property_area_mapping[Property_Area]
+    Dependents_encoded = dependents_mapping[Dependents]
 
-        # Prepare input data for prediction
-        input_data = pd.DataFrame([{
-            "Credit_History": Credit_History,
-            "Education": 1 if Education == "Graduate" else 0,
-            "ApplicantIncome": ApplicantIncome,
-            "CoapplicantIncome": CoapplicantIncome,
-            "Loan_Amount_Term": Loan_Amount_Term,
-            "Property_Area": Property_Area_encoded,
-            "Dependents": Dependents_encoded,
-            "LoanAmount": Loan_Amount
-        }])
+    # Prepare input data for prediction
+    input_data = pd.DataFrame([{
+        "Credit_History": Credit_History,
+        "Education": 1 if Education == "Graduate" else 0,
+        "ApplicantIncome": ApplicantIncome,
+        "CoapplicantIncome": CoapplicantIncome,
+        "Loan_Amount_Term": Loan_Amount_Term,
+        "Property_Area": Property_Area_encoded,
+        "Dependents": Dependents_encoded,
+        "Loan_Amount": Loan_Amount  # Use the correct column name
+    }])
 
-        # Prediction
-        result = prediction(input_data, model, scaler)
+    # Prediction
+    result = prediction(input_data, model, scaler)
 
-        # Save to database
-        save_to_database(Gender, Married, Dependents, Self_Employed, Loan_Amount, Property_Area, 
-                         Credit_History, Education, ApplicantIncome, CoapplicantIncome, 
-                         Loan_Amount_Term, result)
+    # Save to database
+    save_to_database(Gender, Married, Dependents, Self_Employed, Loan_Amount, Property_Area, 
+                     Credit_History, Education, ApplicantIncome, CoapplicantIncome, 
+                     Loan_Amount_Term, result)
 
-        # Display result
-        st.success(f"Loan Prediction: {result}")
+    # Display result
+    st.success(f"Loan Prediction: {result}")
 
-        # Explain the prediction
-        st.header("Explanation of Prediction")
-        bar_chart = explain_prediction(input_data, model)
-        st.pyplot(bar_chart)
+    # Explain the prediction
+    st.header("Explanation of Prediction")
+    bar_chart = explain_prediction(input_data, model)
+    st.pyplot(bar_chart)
 
 if __name__ == '__main__':
     main()
