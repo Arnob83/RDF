@@ -107,7 +107,7 @@ def explain_prediction(input_data, model, final_result):
     # Generate explanation text
     explanation_text = f"**Why your loan is {final_result}:**\n\n"
     for feature, shap_value in zip(feature_names, shap_values_for_input):
-        # Convert shap_value to a scalar (if it's an array)
+        # Convert shap_value to a scalar if it's an array
         shap_scalar = shap_value[0] if isinstance(shap_value, np.ndarray) else shap_value
         explanation_text += (
             f"- **{feature}**: {'Positive' if shap_scalar > 0 else 'Negative'} contribution with a SHAP value of {shap_scalar:.2f}\n"
@@ -118,15 +118,22 @@ def explain_prediction(input_data, model, final_result):
     else:
         explanation_text += "\nThe loan was approved because the positive contributions outweighed the negative ones."
 
+    # Fix for the bar plot: Use scalar SHAP values
+    shap_values_for_plot = [
+        shap_value[0] if isinstance(shap_value, np.ndarray) else shap_value
+        for shap_value in shap_values_for_input
+    ]
+
     # Create bar plot for SHAP values
     plt.figure(figsize=(8, 5))
-    plt.barh(feature_names, shap_values_for_input, color=["green" if val > 0 else "red" for val in shap_values_for_input])
+    plt.barh(feature_names, shap_values_for_plot, color=["green" if val > 0 else "red" for val in shap_values_for_plot])
     plt.xlabel("SHAP Value (Impact on Prediction)")
     plt.ylabel("Features")
     plt.title("Feature Contributions to Prediction")
     plt.tight_layout()
 
     return explanation_text, plt
+
 
 
 # Main Streamlit app
