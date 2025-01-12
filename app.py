@@ -156,5 +156,6 @@ def main():
     bar_chart = explain_prediction(input_data, model)
     st.pyplot(bar_chart)
 
+
 if __name__ == '__main__':
     main()
