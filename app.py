@@ -107,9 +107,10 @@ def explain_prediction(input_data, model, final_result):
     # Generate explanation text
     explanation_text = f"**Why your loan is {final_result}:**\n\n"
     for feature, shap_value in zip(feature_names, shap_values_for_input):
-        # Use `.item()` to handle scalar values
+        # Convert shap_value to a scalar (if it's an array)
+        shap_scalar = shap_value[0] if isinstance(shap_value, np.ndarray) else shap_value
         explanation_text += (
-            f"- **{feature}**: {'Positive' if shap_value.item() > 0 else 'Negative'} contribution with a SHAP value of {shap_value:.2f}\n"
+            f"- **{feature}**: {'Positive' if shap_scalar > 0 else 'Negative'} contribution with a SHAP value of {shap_scalar:.2f}\n"
         )
 
     if final_result == 'Rejected':
@@ -126,6 +127,7 @@ def explain_prediction(input_data, model, final_result):
     plt.tight_layout()
 
     return explanation_text, plt
+
 
 # Main Streamlit app
 def main():
