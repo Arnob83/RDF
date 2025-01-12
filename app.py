@@ -93,9 +93,8 @@ def prediction(input_data, _model, _scaler):
     pred_label = 'Approved' if prediction[0] == 1 else 'Rejected'
     return pred_label
 
-# Explanation function
-def explain_prediction(input_data, final_result):
-    explainer = shap.TreeExplainer(classifier)
+def explain_prediction(input_data, model, final_result):
+    explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(input_data)
     shap_values_for_input = shap_values[0]
 
@@ -117,7 +116,6 @@ def explain_prediction(input_data, final_result):
     plt.title("Feature Contributions to Prediction")
     plt.tight_layout()
     return explanation_text, plt
-
 
 # Main Streamlit app
 def main():
