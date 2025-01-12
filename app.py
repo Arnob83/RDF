@@ -77,18 +77,19 @@ def save_to_database(gender, married, dependents, self_employed, loan_amount, pr
     conn.close()
 
 # Prediction function
+# Updated prediction function
 @st.cache_data
-def prediction(input_data, model, scaler):
+def prediction(input_data, _model, _scaler):
     # Apply feature scaling
     columns_to_scale = ['ApplicantIncome', 'CoapplicantIncome', 'Loan_Amount_Term']
-    input_data[columns_to_scale] = scaler.transform(input_data[columns_to_scale])
+    input_data[columns_to_scale] = _scaler.transform(input_data[columns_to_scale])
 
     # Ensure input data is ordered according to model feature order
-    feature_order = model.feature_names_in_
+    feature_order = _model.feature_names_in_
     input_data = input_data[feature_order]
 
     # Model prediction (0 = Rejected, 1 = Approved)
-    prediction = model.predict(input_data)
+    prediction = _model.predict(input_data)
     pred_label = 'Approved' if prediction[0] == 1 else 'Rejected'
     return pred_label
 
