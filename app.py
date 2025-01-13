@@ -12,23 +12,34 @@ import os
 model_url = "https://raw.githubusercontent.com/Arnob83/D-A/RDF/Random_Forest_model.pkl"
 scaler_url = "https://raw.githubusercontent.com/Arnob83/RDF/main/scaler.pkl"
 
-# Download the model file and save it locally
-model_response = requests.get(model_url)
-with open("Random_Forest_model.pkl", "wb") as file:
-    file.write(model_response.content)
+# Download and save the model and scaler files
+def download_file(url, filename):
+    response = requests.get(url)
+    if response.status_code == 200:
+        with open(filename, "wb") as file:
+            file.write(response.content)
+    else:
+        raise Exception(f"Failed to download {filename}. HTTP Status Code: {response.status_code}")
 
-# Download the scaler file and save it locally
-scaler_response = requests.get(scaler_url)
-with open("scaler.pkl", "wb") as file:
-    file.write(scaler_response.content)
+# Ensure files are downloaded
+if not os.path.exists("Random_Forest_model.pkl"):
+    download_file(model_url, "Random_Forest_model.pkl")
+if not os.path.exists("scaler.pkl"):
+    download_file(scaler_url, "scaler.pkl")
 
 # Load the trained model
-with open("Random_Forest_model.pkl", "rb") as model_file:
-    classifier = pickle.load(model_file)
+try:
+    with open("Random_Forest_model.pkl", "rb") as model_file:
+        classifier = pickle.load(model_file)
+except Exception as e:
+    st.error(f"Error loading model: {e}")
 
 # Load the scaler
-with open("scaler.pkl", "rb") as scaler_file:
-    scaler = pickle.load(scaler_file)
+try:
+    with open("scaler.pkl", "rb") as scaler_file:
+        scaler = pickle.load(scaler_file)
+except Exception as e:
+    st.error(f"Error loading scaler: {e}")
 
 # Initialize SQLite database
 def init_db():
@@ -128,33 +139,8 @@ def main():
     init_db()
 
     # App layout
-    st.markdown(
-        """
-        <style>
-        .main-container {
-            background-color: #f4f6f9;
-            border: 2px solid #e6e8eb;
-            padding: 20px;
-            border-radius: 10px;
-        }
-        .header {
-            background-color: #4caf50;
-            padding: 15px;
-            border-radius: 10px;
-            text-align: center;
-        }
-        .header h1 {
-            color: white;
-        }
-        </style>
-        <div class="main-container">
-        <div class="header">
-        <h1>Loan Prediction ML App</h1>
-        </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    st.title("Loan Prediction ML App")
+    st.markdown("Fill in the details below to predict loan approval.")
 
     dependents_mapping = {'0': 0.6861, '1': 0.6471, '2': 0.7525, '3+': 0.6471}
     property_area_mapping = {'Rural': 0.6145, 'Semiurban': 0.7682, 'Urban': 0.6584}
