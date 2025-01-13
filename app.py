@@ -237,5 +237,19 @@ def main():
         st.markdown(explanation_text)
         st.pyplot(shap_plot)
 
+# Download database button
+    if st.button("Download Database"):
+        if os.path.exists("loan_data.db"):
+            with open("loan_data.db", "rb") as f:
+                st.download_button(
+                    label="Download SQLite Database",
+                    data=f,
+                    file_name="loan_data.db",
+                    mime="application/octet-stream"
+                )
+        else:
+            st.error("Database file not found.")
+
+
 if __name__ == "__main__":
     main()
