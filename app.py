@@ -9,10 +9,10 @@ import shap
 from shap.maskers import Independent
 
 # URLs for the model and scaler files in your GitHub repository
-model_url = "https://raw.githubusercontent.com/Arnob83/MLP/main/Logistic_Regression_model.pkl"
-scaler_url = "https://raw.githubusercontent.com/Arnob83/MLP/main/scaler.pkl"
+model_url = "https://raw.githubusercontent.com/Arnob83/RDF/main/Logistic_Regression_model.pkl"
+scaler_url = "https://raw.githubusercontent.com/Arnob83/RDF/main/scaler.pkl"
 
-x_train_url = "https://raw.githubusercontent.com/Arnob83/MLP/main/X_train_scaled.pkl"
+x_train_url = "https://raw.githubusercontent.com/Arnob83/RDF/main/X_train_scaled.pkl"
 
 # Download the model file and save it locally
 model_response = requests.get(model_url)
