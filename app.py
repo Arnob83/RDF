@@ -109,12 +109,11 @@ def prediction(Credit_History, Education, ApplicantIncome, CoapplicantIncome, Lo
 
 # Explain prediction
 def explain_prediction(input_data, final_result):
-    explainer = shap.TreeExplainer(model)
+    explainer = shap.TreeExplainer(classifier)
     shap_values = explainer.shap_values(input_data)
     shap_values_for_input = shap_values[0]
 
-
-feature_names = input_data.columns
+    feature_names = input_data.columns
     explanation_text = f"**Why your loan is {final_result}:**\n\n"
     for feature, shap_value in zip(feature_names, shap_values_for_input):
         explanation_text += (
@@ -132,6 +131,7 @@ feature_names = input_data.columns
     plt.title("Feature Contributions to Prediction")
     plt.tight_layout()
     return explanation_text, plt
+
 
 
 
