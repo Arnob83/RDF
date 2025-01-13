@@ -218,11 +218,12 @@ def main():
     if st.button("Predict"):
         result, raw_input_data, input_data_filtered, probabilities = prediction(
             Credit_History,
-            Education_1,
+            Education,
             ApplicantIncome,
             CoapplicantIncome,
             Loan_Amount_Term,
             Property_Area
+            Gender
         )
 
         # Save data to database
