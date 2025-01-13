@@ -222,7 +222,7 @@ def main():
             ApplicantIncome,
             CoapplicantIncome,
             Loan_Amount_Term,
-            Property_Area
+            Property_Area,
             Gender
         )
 
