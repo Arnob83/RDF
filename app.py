@@ -9,7 +9,7 @@ import requests
 import os
 
 # URLs for the model and scaler files
-model_url = "https://raw.githubusercontent.com/Arnob83/RDF/Random_Forest_model.pkl"
+model_url = "https://raw.githubusercontent.com/Arnob83/RDF/main/Random_Forest_model.pkl"
 scaler_url = "https://raw.githubusercontent.com/Arnob83/RDF/main/scaler.pkl"
 
 # Download the model file and save it locally
