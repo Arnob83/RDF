@@ -96,8 +96,8 @@ def prediction(Credit_History, Education_1, ApplicantIncome, CoapplicantIncome, 
 
     # Create input data with all user inputs
     input_data = pd.DataFrame(
-        [[Credit_History, Education_1, ApplicantIncome, CoapplicantIncome, Loan_Amount_Term, Property_Area]],
-        columns=["Credit_History", "Education_1", "ApplicantIncome", "CoapplicantIncome", "Loan_Amount_Term", "Property_Area"]
+        [[Credit_History, Education, ApplicantIncome, CoapplicantIncome, Loan_Amount_Term, Property_Area, Gender]],
+        columns=["Credit_History", "Education", "ApplicantIncome", "CoapplicantIncome", "Loan_Amount_Term", "Property_Area", "Gender"]
     )
 
     # Store raw data before scaling
