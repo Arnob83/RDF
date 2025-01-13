@@ -87,7 +87,7 @@ def save_to_database(gender, married, dependents, self_employed, loan_amount, pr
 @st.cache_data
 def prediction(Credit_History, Education, ApplicantIncome, CoapplicantIncome, Loan_Amount_Term, Property_Area, Gender):
     # Map user inputs to numeric values (if necessary)
-    Education_1 = 0 if Education_1 == "Graduate" else 1
+    Education = 0 if Education == "Graduate" else 1
     Credit_History = 0 if Credit_History == "Unclear Debts" else 1
     
     # Map Property Area to the numeric values
@@ -209,7 +209,7 @@ def main():
     Loan_Amount = st.number_input("Loan Amount", min_value=0.0)
     Property_Area = st.selectbox("Property Area", ("Urban", "Rural", "Semi-urban"))
     Credit_History = st.selectbox("Credit History", ("Unclear Debts", "Clear Debts"))
-    Education_1 = st.selectbox('Education', ("Under_Graduate", "Graduate"))
+    Education = st.selectbox('Education', ("Under_Graduate", "Graduate"))
     ApplicantIncome = st.number_input("Applicant's yearly Income", min_value=0.0)
     CoapplicantIncome = st.number_input("Co-applicant's yearly Income", min_value=0.0)
     Loan_Amount_Term = st.number_input("Loan Term (in months)", min_value=0.0)
@@ -228,7 +228,7 @@ def main():
 
         # Save data to database
         save_to_database(Gender, Married, Dependents, Self_Employed, Loan_Amount, Property_Area, 
-                         Credit_History, Education_1, ApplicantIncome, CoapplicantIncome, 
+                         Credit_History, Education, ApplicantIncome, CoapplicantIncome, 
                          Loan_Amount_Term, result)
 
         # Display the prediction
