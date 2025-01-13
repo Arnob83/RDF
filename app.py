@@ -11,7 +11,6 @@ from shap.maskers import Independent
 # URLs for the model and scaler files in your GitHub repository
 model_url = "https://raw.githubusercontent.com/Arnob83/RDF/main/Logistic_Regression_model.pkl"
 scaler_url = "https://raw.githubusercontent.com/Arnob83/RDF/main/scaler.pkl"
-
 x_train_url = "https://raw.githubusercontent.com/Arnob83/RDF/main/X_train_scaled.pkl"
 
 # Download the model file and save it locally
@@ -93,6 +92,9 @@ def prediction(Credit_History, Education, ApplicantIncome, CoapplicantIncome, Lo
     # Map Property Area to the numeric values
     property_area_mapping = {'Rural': 0.6145, 'Semiurban': 0.7682, 'Urban': 0.6584}
     Property_Area = property_area_mapping.get(Property_Area, 0.6145)  # Default to 'Rural' if not found
+
+    # Map Gender to numeric values: Male = 1, Female = 0
+    Gender = 1 if Gender == "Male" else 0
 
     # Create input data with all user inputs
     input_data = pd.DataFrame(
@@ -212,57 +214,28 @@ def main():
     Education = st.selectbox('Education', ("Under_Graduate", "Graduate"))
     ApplicantIncome = st.number_input("Applicant's yearly Income", min_value=0.0)
     CoapplicantIncome = st.number_input("Co-applicant's yearly Income", min_value=0.0)
-    Loan_Amount_Term = st.number_input("Loan Term (in months)", min_value=0.0)
+    Loan_Amount_Term = st.number_input("Loan Amount Term (in months)", min_value=0)
 
-    # Prediction and database saving
-    if st.button("Predict"):
-        result, raw_input_data, input_data_filtered, probabilities = prediction(
-            Credit_History,
-            Education,
-            ApplicantIncome,
-            CoapplicantIncome,
-            Loan_Amount_Term,
-            Property_Area,
-            Gender
+    # Prediction button
+    if st.button("Predict Loan Approval"):
+        # Make the prediction
+        result, raw_input, processed_input, probabilities = prediction(
+            Credit_History, Education, ApplicantIncome, CoapplicantIncome, Loan_Amount_Term, Property_Area, Gender
         )
 
-        # Save data to database
+        # Save to database
         save_to_database(Gender, Married, Dependents, Self_Employed, Loan_Amount, Property_Area, 
                          Credit_History, Education, ApplicantIncome, CoapplicantIncome, 
                          Loan_Amount_Term, result)
 
-        # Display the prediction
-        if result == "Approved":
-            st.success(f"Your loan is Approved! (Probability: {probabilities[0][1]:.2f})", icon="✅")
-        else:
-            st.error(f"Your loan is Rejected! (Probability: {probabilities[0][0]:.2f})", icon="❌")
+        # Display results
+        st.success(f"Prediction: **{result}**")
+        st.write("Probabilities (Rejected: 0, Approved: 1):", probabilities)
+        
+        # Explain prediction and show SHAP explanation
+        explanation_text, shap_plot = explain_prediction(processed_input, result)
+        st.markdown(explanation_text)
+        st.pyplot(shap_plot)
 
-        # Show the original user input data (before scaling)
-        st.subheader("User Input Data (Raw)")
-        st.write(raw_input_data)  # Display the raw user input data (before scaling)
-
-        # Optionally show the scaled data (only if needed for feature importance or other insights)
-        st.subheader("Input Data (Scaled)")
-        st.write(pd.DataFrame(input_data_filtered, columns=raw_input_data.columns))  # This will display the scaled values
-
-        # Explanation: Feature Contributions and SHAP Bar Plot
-        st.header("Explanation of Prediction")
-        explanation_text, bar_chart = explain_prediction(input_data_filtered, final_result=result)
-        st.write(explanation_text)
-        st.pyplot(bar_chart)
-
-    # Download database button
-    if st.button("Download Database"):
-        if os.path.exists("loan_data.db"):
-            with open("loan_data.db", "rb") as f:
-                st.download_button(
-                    label="Download SQLite Database",
-                    data=f,
-                    file_name="loan_data.db",
-                    mime="application/octet-stream"
-                )
-        else:
-            st.error("Database file not found.")
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
