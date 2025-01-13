@@ -76,7 +76,7 @@ def save_to_database(gender, married, dependents, self_employed, loan_amount, pr
     conn.commit()
     conn.close()
 
-@st.cache
+@st.cache_data
 def prediction(Credit_History, Education, ApplicantIncome, CoapplicantIncome, Loan_Amount_Term, Dependents, Property_Area):
     # Map inputs using the mappings
     Dependents = dependents_mapping[Dependents]
@@ -93,11 +93,8 @@ def prediction(Credit_History, Education, ApplicantIncome, CoapplicantIncome, Lo
         "Property_Area": Property_Area
     }])
 
-    # Scale the input data using the loaded scaler
-    input_data_scaled = scaler.transform(input_data)
-
     # Predict using the classifier
-    prediction = classifier.predict(input_data_scaled)
+    prediction = classifier.predict(input_data)
     pred_label = 'Approved' if prediction[0] == 1 else 'Rejected'
     return pred_label, input_data
 
@@ -146,4 +143,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-    
