@@ -85,7 +85,7 @@ def save_to_database(gender, married, dependents, self_employed, loan_amount, pr
 
 # Prediction function
 @st.cache_data
-def prediction(Credit_History, Education_1, ApplicantIncome, CoapplicantIncome, Loan_Amount_Term, Property_Area):
+def prediction(Credit_History, Education, ApplicantIncome, CoapplicantIncome, Loan_Amount_Term, Property_Area, Gender):
     # Map user inputs to numeric values (if necessary)
     Education_1 = 0 if Education_1 == "Graduate" else 1
     Credit_History = 0 if Credit_History == "Unclear Debts" else 1
