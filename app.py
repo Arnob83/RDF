@@ -179,12 +179,12 @@ def login():
             st.session_state["logged_in"] = True
             st.session_state["role"] = "admin"
             st.success("Logged in as Admin!")
-            st.experimental_rerun()
+            st.experimental_set_query_params(logged_in="true")
         elif username == "user" and password == "password":  # Replace with user credentials
             st.session_state["logged_in"] = True
             st.session_state["role"] = "user"
             st.success("Logged in as User!")
-            st.experimental_rerun()
+            st.experimental_set_query_params(logged_in="true")
         else:
             st.error("Invalid credentials")
 
@@ -193,7 +193,7 @@ def logout():
     st.session_state["logged_in"] = False
     st.session_state["role"] = None
     st.success("Logged out successfully")
-    st.experimental_rerun()
+    st.experimental_set_query_params(logged_in="false")
 
 # Main Streamlit app
 def main():
