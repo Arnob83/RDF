@@ -179,10 +179,12 @@ def login():
             st.session_state["logged_in"] = True
             st.session_state["role"] = "admin"
             st.success("Logged in as Admin!")
+            st.experimental_rerun()
         elif username == "user" and password == "password":  # Replace with user credentials
             st.session_state["logged_in"] = True
             st.session_state["role"] = "user"
             st.success("Logged in as User!")
+            st.experimental_rerun()
         else:
             st.error("Invalid credentials")
 
@@ -191,6 +193,7 @@ def logout():
     st.session_state["logged_in"] = False
     st.session_state["role"] = None
     st.success("Logged out successfully")
+    st.experimental_rerun()
 
 # Main Streamlit app
 def main():
@@ -208,24 +211,6 @@ def main():
         login()
     else:
         st.header("Loan Prediction ML App")
-        if st.button("Logout"):
-            logout()
-
-        # Check user role for database download access
-        if st.session_state["role"] == "admin":
-            if st.button("Download Database"):
-                if os.path.exists("loan_data.db"):
-                    with open("loan_data.db", "rb") as f:
-                        st.download_button(
-                            label="Download SQLite Database",
-                            data=f,
-                            file_name="loan_data.db",
-                            mime="application/octet-stream"
-                        )
-                else:
-                    st.error("Database file not found.")
-        else:
-            st.info("Only admins can download the database.")
 
         # User inputs and prediction
         Gender = st.selectbox("Gender", ("Male", "Female"))
@@ -255,6 +240,26 @@ def main():
             explanation_text, shap_plot = explain_prediction(processed_input, result)
             st.markdown(explanation_text)
             st.pyplot(shap_plot)
+
+        # Logout and database download options
+        st.divider()
+        if st.button("Logout"):
+            logout()
+
+        if st.session_state["role"] == "admin":
+            if st.button("Download Database"):
+                if os.path.exists("loan_data.db"):
+                    with open("loan_data.db", "rb") as f:
+                        st.download_button(
+                            label="Download SQLite Database",
+                            data=f,
+                            file_name="loan_data.db",
+                            mime="application/octet-stream"
+                        )
+                else:
+                    st.error("Database file not found.")
+        else:
+            st.info("Only admins can download the database.")
 
 if __name__ == "__main__":
     main()
