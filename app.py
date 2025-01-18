@@ -170,16 +170,14 @@ def login():
     password = st.text_input("Password", type="password")
 
     if st.button("Login"):
-        if username == "admin" and password == "password":
+        if username == "admin" and password == "password":  # Replace with your credentials
             st.session_state["logged_in"] = True
             st.session_state["role"] = "admin"
             st.success("Logged in as Admin!")
-            st.experimental_rerun()
-        elif username == "user" and password == "password":
+        elif username == "user" and password == "password":  # Replace with user credentials
             st.session_state["logged_in"] = True
             st.session_state["role"] = "user"
             st.success("Logged in as User!")
-            st.experimental_rerun()
         else:
             st.error("Invalid credentials")
 
@@ -188,7 +186,6 @@ def logout():
     st.session_state["logged_in"] = False
     st.session_state["role"] = None
     st.success("Logged out successfully")
-    st.experimental_rerun()
 
 # Main Streamlit app
 def main():
