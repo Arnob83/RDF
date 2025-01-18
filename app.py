@@ -115,11 +115,6 @@ def prediction(Credit_History, Education, ApplicantIncome, CoapplicantIncome, Lo
     # Ensure input_data columns match the model's expected feature names and order
     trained_features = classifier.feature_names_in_  # Features used in model training
 
-    # Check if input_data columns match the trained features
-    if list(input_data.columns) != list(trained_features):
-        raise ValueError(f"Input data features do not match the model's training features. "
-                         f"Expected: {trained_features}, Found: {input_data.columns}")
-
     # Filter to only include features used by the model
     input_data_filtered = input_data[trained_features]
 
@@ -175,26 +170,25 @@ def login():
     password = st.text_input("Password", type="password")
 
     if st.button("Login"):
-        if username == "admin" and password == "password":  # Replace with your credentials
+        if username == "admin" and password == "password":
             st.session_state["logged_in"] = True
             st.session_state["role"] = "admin"
             st.success("Logged in as Admin!")
-            st.experimental_set_query_params(logged_in="true")
-        elif username == "user" and password == "password":  # Replace with user credentials
+            st.experimental_rerun()
+        elif username == "user" and password == "password":
             st.session_state["logged_in"] = True
             st.session_state["role"] = "user"
             st.success("Logged in as User!")
-            st.experimental_set_query_params(logged_in="true")
+            st.experimental_rerun()
         else:
             st.error("Invalid credentials")
-
 
 # Logout function
 def logout():
     st.session_state["logged_in"] = False
     st.session_state["role"] = None
     st.success("Logged out successfully")
-    st.experimental_set_query_params(logged_in="false")
+    st.experimental_rerun()
 
 # Main Streamlit app
 def main():
