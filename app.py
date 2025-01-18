@@ -231,7 +231,7 @@ def main():
         st.header("Login")
         login()
     else:
-        st.header("Loan Prediction ML App")
+        st.header("Please fill in your personal information.")
 
         # User inputs and prediction
         Gender = st.selectbox("Gender", ("Male", "Female"))
