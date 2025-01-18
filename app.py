@@ -188,6 +188,7 @@ def login():
         else:
             st.error("Invalid credentials")
 
+
 # Logout function
 def logout():
     st.session_state["logged_in"] = False
