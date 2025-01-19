@@ -47,6 +47,7 @@ def init_db():
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS loan_predictions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        customer_name TEXT,
         gender TEXT,
         married TEXT,
         dependents INTEGER,
@@ -65,18 +66,18 @@ def init_db():
     conn.close()
 
 # Save prediction data to the database
-def save_to_database(gender, married, dependents, self_employed, loan_amount, property_area, 
+def save_to_database(customer_name, gender, married, dependents, self_employed, loan_amount, property_area, 
                      credit_history, education, applicant_income, coapplicant_income, 
                      loan_amount_term, result):
     conn = sqlite3.connect("loan_data.db")
     cursor = conn.cursor()
     cursor.execute("""
     INSERT INTO loan_predictions (
-        gender, married, dependents, self_employed, loan_amount, property_area, 
+        customer_name, gender, married, dependents, self_employed, loan_amount, property_area, 
         credit_history, education, applicant_income, coapplicant_income, loan_amount_term, result
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (gender, married, dependents, self_employed, loan_amount, property_area, 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (customer_name, gender, married, dependents, self_employed, loan_amount, property_area, 
           credit_history, education, applicant_income, coapplicant_income, 
           loan_amount_term, result))
     conn.commit()
@@ -206,6 +207,7 @@ def main():
     else:
         st.header("Please fill-up your personal information.")
 
+        Customer_Name = st.text_input("Customer Name")
         Gender = st.selectbox("Gender", ("Male", "Female"))
         Married = st.selectbox("Married", ("Yes", "No"))
         Dependents = st.selectbox("Dependents", (0, 1, 2, 3, 4, 5))
@@ -219,20 +221,23 @@ def main():
         Loan_Amount_Term = st.number_input("Loan Amount Term (in months)", min_value=0)
 
         if st.button("Predict Loan Approval"):
-            result, raw_input, processed_input, probabilities = prediction(
-                Credit_History, Education, ApplicantIncome, CoapplicantIncome, Loan_Amount_Term, Property_Area, Gender
-            )
+            if not Customer_Name:
+                st.error("Please enter the customer's name.")
+            else:
+                result, raw_input, processed_input, probabilities = prediction(
+                    Credit_History, Education, ApplicantIncome, CoapplicantIncome, Loan_Amount_Term, Property_Area, Gender
+                )
 
-            save_to_database(Gender, Married, Dependents, Self_Employed, Loan_Amount, Property_Area, 
-                             Credit_History, Education, ApplicantIncome, CoapplicantIncome, 
-                             Loan_Amount_Term, result)
+                save_to_database(Customer_Name, Gender, Married, Dependents, Self_Employed, Loan_Amount, Property_Area, 
+                                 Credit_History, Education, ApplicantIncome, CoapplicantIncome, 
+                                 Loan_Amount_Term, result)
 
-            st.success(f"Prediction: **{result}**")
-            st.write("Probabilities (Rejected: 0, Approved: 1):", probabilities)
+                st.success(f"Prediction: **{result}**")
+                st.write("Probabilities (Rejected: 0, Approved: 1):", probabilities)
 
-            explanation_text, shap_plot = explain_prediction(processed_input, result)
-            st.markdown(explanation_text)
-            st.pyplot(shap_plot)
+                explanation_text, shap_plot = explain_prediction(processed_input, result)
+                st.markdown(explanation_text)
+                st.pyplot(shap_plot)
 
         st.divider()
         if st.button("Logout"):
