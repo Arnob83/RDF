@@ -164,12 +164,18 @@ def explain_prediction(input_data_filtered, final_result):
 
     return explanation_text, plt
 
+
 # Login function
 def login():
+    if "login_attempt" not in st.session_state:
+        st.session_state["login_attempt"] = False  # Initialize login attempt flag
+
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
 
     if st.button("Login"):
+        st.session_state["login_attempt"] = True  # Set login attempt flag
+
         if username == "admin" and password == "password":  # Replace with your credentials
             st.session_state["logged_in"] = True
             st.session_state["role"] = "admin"
@@ -180,6 +186,7 @@ def login():
             st.success("Logged in as User!")
         else:
             st.error("Invalid credentials")
+            st.session_state["login_attempt"] = False  # Reset flag for failed login attempts
 
 # Logout function
 def logout():
@@ -230,6 +237,10 @@ def main():
     if not st.session_state["logged_in"]:
         st.header("Login")
         login()
+
+        # Prevent showing the second page when login fails
+        if not st.session_state.get("login_attempt", False):
+            return
     else:
         st.header("Please fill in your personal information.")
 
@@ -284,3 +295,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
