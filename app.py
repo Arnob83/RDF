@@ -13,11 +13,12 @@ model_url = "https://raw.githubusercontent.com/Arnob83/RDF/main/Logistic_Regress
 scaler_url = "https://raw.githubusercontent.com/Arnob83/RDF/main/scaler.pkl"
 x_train_url = "https://raw.githubusercontent.com/Arnob83/RDF/main/X_train_scaled.pkl"
 
-# Download and save the model and scaler files
+# Download the model file and save it locally
 model_response = requests.get(model_url)
 with open("Logistic_Regression_model.pkl", "wb") as file:
     file.write(model_response.content)
 
+# Download the scaler file and save it locally
 scaler_response = requests.get(scaler_url)
 with open("scaler.pkl", "wb") as file:
     file.write(scaler_response.content)
@@ -89,6 +90,7 @@ def prediction(Credit_History, Education, ApplicantIncome, CoapplicantIncome, Lo
     
     property_area_mapping = {'Rural': 0.6145, 'Semiurban': 0.7682, 'Urban': 0.6584}
     Property_Area = property_area_mapping.get(Property_Area, 0.6145)
+
     Gender = 1 if Gender == "Male" else 0
 
     input_data = pd.DataFrame(
@@ -96,19 +98,21 @@ def prediction(Credit_History, Education, ApplicantIncome, CoapplicantIncome, Lo
         columns=["Credit_History", "Education", "ApplicantIncome", "CoapplicantIncome", "Loan_Amount_Term", "Property_Area", "Gender"]
     )
 
-    raw_input_data = input_data.copy()
     features_to_scale = input_data[["ApplicantIncome", "CoapplicantIncome", "Loan_Amount_Term"]]
     scaled_features = scaler.transform(features_to_scale)
+
     input_data[["ApplicantIncome", "CoapplicantIncome", "Loan_Amount_Term"]] = scaled_features
     trained_features = classifier.feature_names_in_
+
     input_data_filtered = input_data[trained_features]
 
     prediction = classifier.predict(input_data_filtered)
     probabilities = classifier.predict_proba(input_data_filtered)
+    
     pred_label = 'Approved' if prediction[0] == 1 else 'Rejected'
-    return pred_label, raw_input_data, input_data_filtered, probabilities
+    return pred_label, input_data, input_data_filtered, probabilities
 
-# Explanation function
+# SHAP explanation function
 def explain_prediction(input_data_filtered, final_result):
     masker = Independent(X_train_scaled)
     explainer = shap.LinearExplainer(classifier, masker)
@@ -119,7 +123,9 @@ def explain_prediction(input_data_filtered, final_result):
 
     explanation_text = f"**Why your loan is {final_result}:**\n\n"
     for feature, shap_value in zip(feature_names, shap_values_for_input):
-        explanation_text += f"- **{feature}**: {'Positive' if shap_value > 0 else 'Negative'} contribution with a SHAP value of {shap_value:.2f}\n"
+        explanation_text += (
+            f"- **{feature}**: {'Positive' if shap_value > 0 else 'Negative'} contribution with a SHAP value of {shap_value:.2f}\n"
+        )
 
     if final_result == 'Rejected':
         explanation_text += "\nThe loan was rejected because the negative contributions outweighed the positive ones."
@@ -137,18 +143,18 @@ def explain_prediction(input_data_filtered, final_result):
 
 # Login function
 def login():
-    st.header("Login")
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
 
-    if username == "admin" and password == "password":
-        st.session_state["logged_in"] = True
-        st.session_state["role"] = "admin"
-    elif username == "user" and password == "password":
-        st.session_state["logged_in"] = True
-        st.session_state["role"] = "user"
-    elif st.button("Login"):
-        st.error("Invalid credentials")
+    if st.button("Login"):
+        if username == "admin" and password == "password":
+            st.session_state["logged_in"] = True
+            st.session_state["role"] = "admin"
+        elif username == "user" and password == "password":
+            st.session_state["logged_in"] = True
+            st.session_state["role"] = "user"
+        else:
+            st.error("Invalid credentials")
 
 # Main Streamlit app
 def main():
@@ -156,39 +162,49 @@ def main():
 
     if "logged_in" not in st.session_state:
         st.session_state["logged_in"] = False
+        st.session_state["role"] = None
 
     if not st.session_state["logged_in"]:
+        st.header("Login")
         login()
     else:
-        st.header("Please fill in your personal information.")
-        
-        Gender = st.selectbox("Gender", ("Male", "Female"))
-        Married = st.selectbox("Married", ("Yes", "No"))
-        Dependents = st.selectbox("Dependents", (0, 1, 2, 3, 4, 5))
-        Self_Employed = st.selectbox("Self Employed", ("Yes", "No"))
-        Loan_Amount = st.number_input("Loan Amount", min_value=0.0)
-        Property_Area = st.selectbox("Property Area", ("Urban", "Rural", "Semi-urban"))
-        Credit_History = st.selectbox("Credit History", ("Unclear Debts", "Clear Debts"))
-        Education = st.selectbox('Education', ("Under_Graduate", "Graduate"))
-        ApplicantIncome = st.number_input("Applicant's yearly Income", min_value=0.0)
-        CoapplicantIncome = st.number_input("Co-applicant's yearly Income", min_value=0.0)
-        Loan_Amount_Term = st.number_input("Loan Amount Term (in months)", min_value=0)
+        if "next_page" not in st.session_state:
+            st.session_state["next_page"] = False
 
-        if st.button("Predict Loan Approval"):
-            result, raw_input, processed_input, probabilities = prediction(
-                Credit_History, Education, ApplicantIncome, CoapplicantIncome, Loan_Amount_Term, Property_Area, Gender
-            )
+        if not st.session_state["next_page"]:
+            st.success(f"Logged in as {st.session_state['role']}.")
+            if st.button("Go to Next Page"):
+                st.session_state["next_page"] = True
+                st.experimental_rerun()
+        else:
+            st.header("Loan Prediction Page")
+            Gender = st.selectbox("Gender", ("Male", "Female"))
+            Married = st.selectbox("Married", ("Yes", "No"))
+            Dependents = st.selectbox("Dependents", (0, 1, 2, 3, 4, 5))
+            Self_Employed = st.selectbox("Self Employed", ("Yes", "No"))
+            Loan_Amount = st.number_input("Loan Amount", min_value=0.0)
+            Property_Area = st.selectbox("Property Area", ("Urban", "Rural", "Semi-urban"))
+            Credit_History = st.selectbox("Credit History", ("Unclear Debts", "Clear Debts"))
+            Education = st.selectbox('Education', ("Under_Graduate", "Graduate"))
+            ApplicantIncome = st.number_input("Applicant's yearly Income", min_value=0.0)
+            CoapplicantIncome = st.number_input("Co-applicant's yearly Income", min_value=0.0)
+            Loan_Amount_Term = st.number_input("Loan Amount Term (in months)", min_value=0)
 
-            save_to_database(Gender, Married, Dependents, Self_Employed, Loan_Amount, Property_Area, 
-                             Credit_History, Education, ApplicantIncome, CoapplicantIncome, 
-                             Loan_Amount_Term, result)
+            if st.button("Predict Loan Approval"):
+                result, raw_input, processed_input, probabilities = prediction(
+                    Credit_History, Education, ApplicantIncome, CoapplicantIncome, Loan_Amount_Term, Property_Area, Gender
+                )
 
-            st.success(f"Prediction: **{result}**")
-            st.write("Probabilities (Rejected: 0, Approved: 1):", probabilities)
+                save_to_database(Gender, Married, Dependents, Self_Employed, Loan_Amount, Property_Area, 
+                                 Credit_History, Education, ApplicantIncome, CoapplicantIncome, 
+                                 Loan_Amount_Term, result)
 
-            explanation_text, shap_plot = explain_prediction(processed_input, result)
-            st.markdown(explanation_text)
-            st.pyplot(shap_plot)
+                st.success(f"Prediction: **{result}**")
+                st.write("Probabilities (Rejected: 0, Approved: 1):", probabilities)
+
+                explanation_text, shap_plot = explain_prediction(processed_input, result)
+                st.markdown(explanation_text)
+                st.pyplot(shap_plot)
 
 if __name__ == "__main__":
     main()
