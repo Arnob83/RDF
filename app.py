@@ -190,7 +190,7 @@ def main():
         </style>
         <div class="main-container">
         <div class="header">
-        <h1>Loan Prediction ML App</h1>
+        <h1>Bank Loan Prediction ML App</h1>
         </div>
         </div>
         """,
