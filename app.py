@@ -1,46 +1,41 @@
 import sqlite3
 import pickle
 import streamlit as st
-import matplotlib.pyplot as plt
-import pandas as pd
 import requests
 import os
-import shap
-from shap.maskers import Independent
 
 # URLs for the model and scaler files in your GitHub repository
 model_url = "https://raw.githubusercontent.com/Arnob83/RDF/main/Logistic_Regression_model.pkl"
 scaler_url = "https://raw.githubusercontent.com/Arnob83/RDF/main/scaler.pkl"
 x_train_url = "https://raw.githubusercontent.com/Arnob83/RDF/main/X_train_scaled.pkl"
 
-# Download the model file and save it locally
-model_response = requests.get(model_url)
-with open("Logistic_Regression_model.pkl", "wb") as file:
-    file.write(model_response.content)
+# Download the model, scaler, and X_train files
+def download_files():
+    model_response = requests.get(model_url)
+    with open("Logistic_Regression_model.pkl", "wb") as file:
+        file.write(model_response.content)
 
-# Download the scaler file and save it locally
-scaler_response = requests.get(scaler_url)
-with open("scaler.pkl", "wb") as file:
-    file.write(scaler_response.content)
+    scaler_response = requests.get(scaler_url)
+    with open("scaler.pkl", "wb") as file:
+        file.write(scaler_response.content)
 
-# Load the trained model
-with open("Logistic_Regression_model.pkl", "rb") as model_file:
-    classifier = pickle.load(model_file)
+    response_x_train = requests.get(x_train_url)
+    with open("X_train_scaled", "wb") as file:
+        file.write(response_x_train.content)
 
-# Load the scaler
-with open("scaler.pkl", "rb") as scaler_file:
-    scaler = pickle.load(scaler_file)
+    # Load the model, scaler, and X_train
+    with open("Logistic_Regression_model.pkl", "rb") as model_file:
+        classifier = pickle.load(model_file)
 
-# Download and save the X_train.pkl file
-response_x_train = requests.get(x_train_url)
-with open("X_train_scaled", "wb") as file:
-    file.write(response_x_train.content)
+    with open("scaler.pkl", "rb") as scaler_file:
+        scaler = pickle.load(scaler_file)
 
-# Load X_train
-with open("X_train_scaled", "rb") as file:
-    X_train_scaled = pickle.load(file)
+    with open("X_train_scaled", "rb") as file:
+        X_train_scaled = pickle.load(file)
+    
+    return classifier, scaler, X_train_scaled
 
-# Initialize SQLite databases
+# Initialize SQLite databases for users and loan data
 def init_db():
     conn = sqlite3.connect("registration_data.db")
     cursor = conn.cursor()
@@ -103,7 +98,7 @@ def check_credentials(phone_number, password):
     conn.close()
     return user
 
-# Save loan prediction data to the database
+# Save loan prediction data
 def save_to_database(customer_name, gender, married, dependents, self_employed, loan_amount, property_area, 
                      credit_history, education, applicant_income, coapplicant_income, 
                      loan_amount_term, result):
@@ -123,8 +118,8 @@ def save_to_database(customer_name, gender, married, dependents, self_employed, 
 
 # Login function
 def login():
-    phone_number = st.text_input("Phone Number")
-    password = st.text_input("Password", type="password")
+    phone_number = st.text_input("Phone Number", key="login_phone_number")
+    password = st.text_input("Password", type="password", key="login_password")
 
     if st.button("Login"):
         if phone_number == "admin" and password == "adminpassword":  # Admin credentials
@@ -142,9 +137,9 @@ def login():
 
 # Register function
 def register():
-    phone_number = st.text_input("Phone Number")
-    password = st.text_input("Password", type="password")
-    confirm_password = st.text_input("Confirm Password", type="password")
+    phone_number = st.text_input("Phone Number", key="register_phone_number")
+    password = st.text_input("Password", type="password", key="register_password")
+    confirm_password = st.text_input("Confirm Password", type="password", key="confirm_password")
 
     if st.button("Register"):
         if password != confirm_password:
@@ -154,6 +149,12 @@ def register():
         else:
             register_user(phone_number, password)
             st.success("Registration successful! You can now log in.")
+
+# Logout function
+def logout():
+    st.session_state["logged_in"] = False
+    st.session_state["role"] = None
+    st.success("You have been logged out.")
 
 # Main Streamlit app
 def main():
@@ -198,9 +199,7 @@ def main():
         register()
     else:
         st.header("Please fill-up your personal information.")
-
-        # ... (rest of the code for loan prediction)
-        # Include the existing form and prediction logic here.
+        # Add your loan prediction form and logic here.
 
         st.divider()
         if st.button("Logout"):
@@ -222,4 +221,5 @@ def main():
             st.info("Only admins can download the database.")
 
 if __name__ == "__main__":
+    download_files()  # Download necessary files
     main()
