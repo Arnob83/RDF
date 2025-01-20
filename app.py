@@ -4,9 +4,7 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import pandas as pd
 import requests
-import os
 import shap
-from shap.maskers import Independent
 
 # URLs for the model and scaler files in your GitHub repository
 model_url = "https://raw.githubusercontent.com/Arnob83/RDF/main/Logistic_Regression_model.pkl"
@@ -40,21 +38,12 @@ with open("X_train_scaled.pkl", "wb") as file:
 with open("X_train_scaled.pkl", "rb") as file:
     X_train_scaled = pickle.load(file)
 
-# Initialize SQLite database for users and loan data
+# Initialize SQLite database
 def init_db():
     conn = sqlite3.connect("loan_data.db")
     cursor = conn.cursor()
     
-    # User table for login and registration
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        phone TEXT UNIQUE,
-        password TEXT
-    )
-    """)
-    
-    # Loan predictions table
+    # Table for loan predictions
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS loan_predictions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -76,28 +65,12 @@ def init_db():
     conn.commit()
     conn.close()
 
-# Register a new user
-def register_user(phone, password):
-    conn = sqlite3.connect("loan_data.db")
-    cursor = conn.cursor()
-    try:
-        cursor.execute("INSERT INTO users (phone, password) VALUES (?, ?)", (phone, password))
-        conn.commit()
-        st.success("Registration successful! Please log in.")
-    except sqlite3.IntegrityError:
-        st.error("Phone number already registered!")
-    conn.close()
-
-# Authenticate user
+# Authenticate user or admin
 def authenticate_user(phone, password):
-    if phone == "admin" and password == "admin123":  # Admin credentials
+    # Admin credentials
+    if phone == "admin" and password == "admin123":
         return "admin"
-    conn = sqlite3.connect("loan_data.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE phone = ? AND password = ?", (phone, password))
-    user = cursor.fetchone()
-    conn.close()
-    return "user" if user else None
+    return None
 
 # Save prediction data to the database
 def save_to_database(customer_name, gender, married, dependents, self_employed, loan_amount, property_area, 
@@ -161,52 +134,31 @@ def main():
         st.session_state["user_role"] = None
 
     if not st.session_state["logged_in"]:
-        st.header("Login or Register")
+        st.header("Login")
+        phone = st.text_input("Phone Number")
+        password = st.text_input("Password", type="password")
 
-        action = st.radio("Choose an action", ["Login", "Register"])
-
-        if action == "Register":
-            phone = st.text_input("Phone Number")
-            password = st.text_input("Password", type="password")
-
-            if st.button("Register"):
-                if phone and password:
-                    register_user(phone, password)
-                else:
-                    st.error("Please fill in all fields!")
-
-        if action == "Login":
-            phone = st.text_input("Phone Number")
-            password = st.text_input("Password", type="password")
-
-            if st.button("Login"):
-                user_role = authenticate_user(phone, password)
-                if user_role == "user":
-                    st.session_state["logged_in"] = True
-                    st.session_state["user_role"] = "user"
-                    st.success("Login successful!")
-                elif user_role == "admin":
-                    st.session_state["logged_in"] = True
-                    st.session_state["user_role"] = "admin"
-                    st.success("Admin login successful!")
-                else:
-                    st.error("Invalid phone number or password!")
+        if st.button("Login"):
+            user_role = authenticate_user(phone, password)
+            if user_role == "admin":
+                st.session_state["logged_in"] = True
+                st.session_state["user_role"] = "admin"
+                st.success("Admin login successful!")
+            else:
+                st.error("Invalid phone number or password!")
 
     else:
         if st.session_state["user_role"] == "admin":
             st.header("Admin Panel")
-            if st.button("Download User Data"):
-                conn = sqlite3.connect("loan_data.db")
-                df_users = pd.read_sql_query("SELECT * FROM users", conn)
-                conn.close()
-                st.download_button("Download User Data", df_users.to_csv(index=False), "users.csv", "text/csv")
-            
-            if st.button("Download Predictions Data"):
-                conn = sqlite3.connect("loan_data.db")
-                df_predictions = pd.read_sql_query("SELECT * FROM loan_predictions", conn)
-                conn.close()
-                st.download_button("Download Prediction Data", df_predictions.to_csv(index=False), "predictions.csv", "text/csv")
-
+            conn = sqlite3.connect("loan_data.db")
+            df_predictions = pd.read_sql_query("SELECT * FROM loan_predictions", conn)
+            conn.close()
+            st.dataframe(df_predictions)
+            st.download_button("Download Prediction Data", df_predictions.to_csv(index=False), "predictions.csv", "text/csv")
+            if st.button("Logout"):
+                st.session_state["logged_in"] = False
+                st.session_state["user_role"] = None
+                st.success("Logged out successfully!")
         else:
             st.header("Loan Prediction")
             Customer_Name = st.text_input("Customer Name")
@@ -215,7 +167,7 @@ def main():
             Dependents = st.selectbox("Dependents", (0, 1, 2, 3, 4, 5))
             Self_Employed = st.selectbox("Self Employed", ("Yes", "No"))
             Loan_Amount = st.number_input("Loan Amount", min_value=0.0)
-            Property_Area = st.selectbox("Property Area", ("Urban", "Rural", "Semi-urban"))
+            Property_Area = st.selectbox("Property Area", ("Urban", "Rural", "Semiurban"))
             Credit_History = st.selectbox("Credit History", ("Unclear Debts", "Clear Debts"))
             Education = st.selectbox('Education', ("Under_Graduate", "Graduate"))
             ApplicantIncome = st.number_input("Applicant's yearly Income", min_value=0.0)
@@ -235,13 +187,13 @@ def main():
                     st.success(f"Prediction: **{result}**")
                     st.write("Probabilities:", probabilities)
 
-                    # Display SHAP explanations
+                    # Display SHAP explanation
                     st.header("SHAP Explanation")
-                    shap.force_plot(shap_values.base_values[0], shap_values.values[0, :], processed_input.iloc[0, :], matplotlib=True)
+                    shap.force_plot(shap_values.base_values[0], shap_values.values[0], processed_input.iloc[0], matplotlib=True)
+                    st.pyplot(plt)
 
             if st.button("Logout"):
                 st.session_state["logged_in"] = False
-                st.session_state["user_role"] = None
                 st.success("Logged out successfully!")
 
 if __name__ == "__main__":
