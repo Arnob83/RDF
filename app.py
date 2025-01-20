@@ -40,10 +40,21 @@ with open("X_train_scaled", "wb") as file:
 with open("X_train_scaled", "rb") as file:
     X_train_scaled = pickle.load(file)
 
-# Initialize SQLite database
+# Initialize SQLite database for users and loan data
 def init_db():
     conn = sqlite3.connect("loan_data.db")
     cursor = conn.cursor()
+    
+    # User table for login and registration
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        phone TEXT UNIQUE,
+        password TEXT
+    )
+    """)
+    
+    # Loan predictions table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS loan_predictions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -64,6 +75,27 @@ def init_db():
     """)
     conn.commit()
     conn.close()
+
+# Register a new user
+def register_user(phone, password):
+    conn = sqlite3.connect("loan_data.db")
+    cursor = conn.cursor()
+    try:
+        cursor.execute("INSERT INTO users (phone, password) VALUES (?, ?)", (phone, password))
+        conn.commit()
+        st.success("Registration successful! Please log in.")
+    except sqlite3.IntegrityError:
+        st.error("Phone number already registered!")
+    conn.close()
+
+# Authenticate user
+def authenticate_user(phone, password):
+    conn = sqlite3.connect("loan_data.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE phone = ? AND password = ?", (phone, password))
+    user = cursor.fetchone()
+    conn.close()
+    return user is not None
 
 # Save prediction data to the database
 def save_to_database(customer_name, gender, married, dependents, self_employed, loan_amount, property_area, 
@@ -114,40 +146,41 @@ def prediction(Credit_History, Education, ApplicantIncome, CoapplicantIncome, Lo
     pred_label = 'Approved' if prediction[0] == 1 else 'Rejected'
     return pred_label, raw_input_data, input_data_filtered, probabilities
 
-# Login function
-def login():
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-
-    if st.button("Login"):
-        if username == "admin" and password == "password":  # Replace with your credentials
-            st.session_state["logged_in"] = True
-            st.session_state["role"] = "admin"
-            st.success("Logged in as Admin!")
-        elif username == "user" and password == "password":  # Replace with user credentials
-            st.session_state["logged_in"] = True
-            st.session_state["role"] = "user"
-            st.success("Logged in as User!")
-        else:
-            st.error("Invalid credentials")
-
-# Logout function
-def logout():
-    st.session_state["logged_in"] = False
-    st.session_state["role"] = None
-    st.success("Logged out successfully")
-
 # Main Streamlit app
 def main():
     init_db()
 
     if "logged_in" not in st.session_state:
         st.session_state["logged_in"] = False
-        st.session_state["role"] = None
+        st.session_state["user_phone"] = None
 
     if not st.session_state["logged_in"]:
-        st.header("Login")
-        login()
+        st.header("Login or Register")
+
+        action = st.radio("Choose an action", ["Login", "Register"])
+
+        if action == "Register":
+            phone = st.text_input("Phone Number")
+            password = st.text_input("Password", type="password")
+
+            if st.button("Register"):
+                if phone and password:
+                    register_user(phone, password)
+                else:
+                    st.error("Please fill in all fields!")
+
+        if action == "Login":
+            phone = st.text_input("Phone Number")
+            password = st.text_input("Password", type="password")
+
+            if st.button("Login"):
+                if authenticate_user(phone, password):
+                    st.session_state["logged_in"] = True
+                    st.session_state["user_phone"] = phone
+                    st.success("Login successful!")
+                else:
+                    st.error("Invalid phone number or password!")
+
     else:
         st.header("Loan Prediction")
         Customer_Name = st.text_input("Customer Name")
@@ -170,41 +203,16 @@ def main():
                 result, raw_input, processed_input, probabilities = prediction(
                     Credit_History, Education, ApplicantIncome, CoapplicantIncome, Loan_Amount_Term, Property_Area, Gender
                 )
-
                 save_to_database(Customer_Name, Gender, Married, Dependents, Self_Employed, Loan_Amount, Property_Area, 
                                  Credit_History, Education, ApplicantIncome, CoapplicantIncome, 
                                  Loan_Amount_Term, result)
-
                 st.success(f"Prediction: **{result}**")
-                st.write("Probabilities (Rejected: 0, Approved: 1):", probabilities)
-
-                # SHAP Explanation
-                masker = Independent(X_train_scaled)
-                explainer = shap.LinearExplainer(classifier, masker)
-                shap_values = explainer.shap_values(processed_input)
-                shap_values_for_input = shap_values[0]
-
-                explanation_text = f"**Why your loan is {result}:**\n\n"
-                for feature, shap_value in zip(processed_input.columns, shap_values_for_input):
-                    explanation_text += (
-                        f"- **{feature}**: {'Positive' if shap_value > 0 else 'Negative'} contribution with a SHAP value of {shap_value:.2f}\n"
-                    )
-
-                st.markdown(explanation_text)
-
-                plt.figure(figsize=(8, 5))
-                plt.barh(
-                    processed_input.columns, 
-                    shap_values_for_input, 
-                    color=["green" if val > 0 else "red" for val in shap_values_for_input]
-                )
-                plt.xlabel("SHAP Value (Impact on Prediction)")
-                plt.ylabel("Features")
-                plt.title("Feature Contributions to Prediction")
-                st.pyplot(plt)
+                st.write("Probabilities:", probabilities)
 
         if st.button("Logout"):
-            logout()
+            st.session_state["logged_in"] = False
+            st.session_state["user_phone"] = None
+            st.success("Logged out successfully!")
 
 if __name__ == "__main__":
     main()
