@@ -359,3 +359,6 @@ def main():
 
         if st.button("Logout"):
             logout()
+
+if __name__ == "__main__":
+    main()
