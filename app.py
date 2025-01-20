@@ -67,7 +67,8 @@ def init_db():
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         phone_number TEXT UNIQUE,
-        password TEXT
+        password TEXT,
+        role TEXT
     )
     """)
     conn.commit()
@@ -91,11 +92,11 @@ def save_to_database(customer_name, gender, married, dependents, self_employed, 
     conn.commit()
     conn.close()
 
-# Register new user
-def register_user(phone_number, password):
+# Register new user with role
+def register_user(phone_number, password, role):
     conn = sqlite3.connect("loan_data.db")
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO users (phone_number, password) VALUES (?, ?)", (phone_number, password))
+    cursor.execute("INSERT INTO users (phone_number, password, role) VALUES (?, ?, ?)", (phone_number, password, role))
     conn.commit()
     conn.close()
 
@@ -176,7 +177,7 @@ def login():
         user = authenticate_user(phone_number, password)
         if user:
             st.session_state["logged_in"] = True
-            st.session_state["role"] = "user"
+            st.session_state["role"] = user[3]  # Role is stored in the 4th column
             st.session_state["phone_number"] = phone_number
             st.success("Logged in successfully!")
         else:
@@ -195,7 +196,8 @@ def register():
         if user:
             st.error("User already registered!")
         else:
-            register_user(phone_number, password)
+            role = "admin" if phone_number == "admin" else "user"  # Assign admin role for phone number 'admin'
+            register_user(phone_number, password, role)
             st.success("Registration successful! Please login.")
 
 # Logout function
