@@ -4,53 +4,58 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import pandas as pd
 import requests
+import os
 import shap
+from shap.maskers import Independent
 
 # URLs for the model and scaler files in your GitHub repository
 model_url = "https://raw.githubusercontent.com/Arnob83/RDF/main/Logistic_Regression_model.pkl"
 scaler_url = "https://raw.githubusercontent.com/Arnob83/RDF/main/scaler.pkl"
 x_train_url = "https://raw.githubusercontent.com/Arnob83/RDF/main/X_train_scaled.pkl"
 
-# Download the model and scaler files
-def download_model_and_scaler():
-    model_response = requests.get(model_url)
-    with open("Logistic_Regression_model.pkl", "wb") as file:
-        file.write(model_response.content)
+# Download the model file and save it locally
+model_response = requests.get(model_url)
+with open("Logistic_Regression_model.pkl", "wb") as file:
+    file.write(model_response.content)
 
-    scaler_response = requests.get(scaler_url)
-    with open("scaler.pkl", "wb") as file:
-        file.write(scaler_response.content)
+# Download the scaler file and save it locally
+scaler_response = requests.get(scaler_url)
+with open("scaler.pkl", "wb") as file:
+    file.write(scaler_response.content)
 
-    x_train_response = requests.get(x_train_url)
-    with open("X_train_scaled.pkl", "wb") as file:
-        file.write(x_train_response.content)
+# Load the trained model
+with open("Logistic_Regression_model.pkl", "rb") as model_file:
+    classifier = pickle.load(model_file)
 
-    # Load model, scaler, and training data
-    with open("Logistic_Regression_model.pkl", "rb") as model_file:
-        model = pickle.load(model_file)
-    with open("scaler.pkl", "rb") as scaler_file:
-        scaler = pickle.load(scaler_file)
-    with open("X_train_scaled.pkl", "rb") as x_train_file:
-        x_train = pickle.load(x_train_file)
-    return model, scaler, x_train
+# Load the scaler
+with open("scaler.pkl", "rb") as scaler_file:
+    scaler = pickle.load(scaler_file)
 
-classifier, scaler, X_train_scaled = download_model_and_scaler()
+# Download and save the X_train.pkl file
+response_x_train = requests.get(x_train_url)
+with open("X_train_scaled", "wb") as file:
+    file.write(response_x_train.content)
 
-# Initialize the SQLite database
+# Load X_train
+with open("X_train_scaled", "rb") as file:
+    X_train_scaled = pickle.load(file)
+
+# Initialize SQLite databases
 def init_db():
-    conn = sqlite3.connect("loan_data.db")
+    conn = sqlite3.connect("registration_data.db")
     cursor = conn.cursor()
-    
-    # User table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        phone TEXT UNIQUE,
+        phone_number TEXT UNIQUE,
         password TEXT
     )
     """)
-    
-    # Predictions table
+    conn.commit()
+    conn.close()
+
+    conn = sqlite3.connect("loan_data.db")
+    cursor = conn.cursor()
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS loan_predictions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -72,30 +77,33 @@ def init_db():
     conn.commit()
     conn.close()
 
-# Register a new user
-def register_user(phone, password):
-    conn = sqlite3.connect("loan_data.db")
+# Save user registration data
+def register_user(phone_number, password):
+    conn = sqlite3.connect("registration_data.db")
     cursor = conn.cursor()
-    try:
-        cursor.execute("INSERT INTO users (phone, password) VALUES (?, ?)", (phone, password))
-        conn.commit()
-        st.success("Registration successful! Please log in.")
-    except sqlite3.IntegrityError:
-        st.error("Phone number already registered!")
+    cursor.execute("INSERT INTO users (phone_number, password) VALUES (?, ?)", (phone_number, password))
+    conn.commit()
     conn.close()
 
-# Authenticate user
-def authenticate_user(phone, password):
-    if phone == "admin" and password == "admin123":  # Admin credentials
-        return "admin"
-    conn = sqlite3.connect("loan_data.db")
+# Check if user exists
+def check_user_exists(phone_number):
+    conn = sqlite3.connect("registration_data.db")
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE phone = ? AND password = ?", (phone, password))
+    cursor.execute("SELECT * FROM users WHERE phone_number = ?", (phone_number,))
     user = cursor.fetchone()
     conn.close()
-    return "user" if user else None
+    return user
 
-# Save prediction data to the database
+# Check user credentials
+def check_credentials(phone_number, password):
+    conn = sqlite3.connect("registration_data.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE phone_number = ? AND password = ?", (phone_number, password))
+    user = cursor.fetchone()
+    conn.close()
+    return user
+
+# Save loan prediction data to the database
 def save_to_database(customer_name, gender, married, dependents, self_employed, loan_amount, property_area, 
                      credit_history, education, applicant_income, coapplicant_income, 
                      loan_amount_term, result):
@@ -113,137 +121,105 @@ def save_to_database(customer_name, gender, married, dependents, self_employed, 
     conn.commit()
     conn.close()
 
-# Prediction function
-@st.cache_data
-def prediction(Credit_History, Education, ApplicantIncome, CoapplicantIncome, Loan_Amount_Term, Property_Area, Gender):
-    Education = 0 if Education == "Graduate" else 1
-    Credit_History = 0 if Credit_History == "Unclear Debts" else 1
-    
-    property_area_mapping = {'Rural': 0.6145, 'Semiurban': 0.7682, 'Urban': 0.6584}
-    Property_Area = property_area_mapping.get(Property_Area, 0.6145)
+# Login function
+def login():
+    phone_number = st.text_input("Phone Number")
+    password = st.text_input("Password", type="password")
 
-    Gender = 1 if Gender == "Male" else 0
+    if st.button("Login"):
+        if phone_number == "admin" and password == "adminpassword":  # Admin credentials
+            st.session_state["logged_in"] = True
+            st.session_state["role"] = "admin"
+            st.success("Logged in as Admin!")
+        else:
+            user = check_credentials(phone_number, password)
+            if user:
+                st.session_state["logged_in"] = True
+                st.session_state["role"] = "user"
+                st.success("Logged in successfully!")
+            else:
+                st.error("Invalid credentials or phone number not registered.")
 
-    input_data = pd.DataFrame(
-        [[Credit_History, Education, ApplicantIncome, CoapplicantIncome, Loan_Amount_Term, Property_Area, Gender]],
-        columns=["Credit_History", "Education", "ApplicantIncome", "CoapplicantIncome", "Loan_Amount_Term", "Property_Area", "Gender"]
-    )
+# Register function
+def register():
+    phone_number = st.text_input("Phone Number")
+    password = st.text_input("Password", type="password")
+    confirm_password = st.text_input("Confirm Password", type="password")
 
-    raw_input_data = input_data.copy()
-
-    features_to_scale = input_data[["ApplicantIncome", "CoapplicantIncome", "Loan_Amount_Term"]]
-    scaled_features = scaler.transform(features_to_scale)
-    input_data[["ApplicantIncome", "CoapplicantIncome", "Loan_Amount_Term"]] = scaled_features
-
-    trained_features = classifier.feature_names_in_
-    input_data_filtered = input_data[trained_features]
-
-    prediction = classifier.predict(input_data_filtered)
-    probabilities = classifier.predict_proba(input_data_filtered)
-    
-    pred_label = 'Approved' if prediction[0] == 1 else 'Rejected'
-
-    # SHAP explainer
-    explainer = shap.Explainer(classifier, X_train_scaled)
-    shap_values = explainer(input_data_filtered)
-    return pred_label, raw_input_data, input_data_filtered, probabilities, shap_values
+    if st.button("Register"):
+        if password != confirm_password:
+            st.error("Passwords do not match.")
+        elif check_user_exists(phone_number):
+            st.error("User already registered with this phone number.")
+        else:
+            register_user(phone_number, password)
+            st.success("Registration successful! You can now log in.")
 
 # Main Streamlit app
 def main():
     init_db()
 
+    st.markdown(
+        """
+        <style>
+        .main-container {
+            background-color: #f4f6f9;
+            border: 2px solid #e6e8eb;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        .header {
+            background-color: #4caf50;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .header h1 {
+            color: white;
+        }
+        </style>
+        <div class="main-container">
+        <div class="header">
+        <h1>Bank Loan Prediction ML App</h1>
+        </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
     if "logged_in" not in st.session_state:
         st.session_state["logged_in"] = False
-        st.session_state["user_role"] = None
+        st.session_state["role"] = None
 
     if not st.session_state["logged_in"]:
-        st.header("Login or Register")
-        action = st.radio("Choose an action", ["Login", "Register"])
-
-        if action == "Register":
-            phone = st.text_input("Phone Number")
-            password = st.text_input("Password", type="password")
-
-            if st.button("Register"):
-                if phone and password:
-                    register_user(phone, password)
-                else:
-                    st.error("Please fill in all fields!")
-
-        elif action == "Login":
-            phone = st.text_input("Phone Number")
-            password = st.text_input("Password", type="password")
-
-            if st.button("Login"):
-                user_role = authenticate_user(phone, password)
-                if user_role == "user":
-                    st.session_state["logged_in"] = True
-                    st.session_state["user_role"] = "user"
-                    st.success("Login successful!")
-                elif user_role == "admin":
-                    st.session_state["logged_in"] = True
-                    st.session_state["user_role"] = "admin"
-                    st.success("Admin login successful!")
-                else:
-                    st.error("Invalid phone number or password!")
-
+        st.header("Login / Register")
+        login()
+        st.markdown("**Don't have an account?**")
+        register()
     else:
-        if st.session_state["user_role"] == "admin":
-            st.header("Admin Panel")
-            conn = sqlite3.connect("loan_data.db")
-            df_predictions = pd.read_sql_query("SELECT * FROM loan_predictions", conn)
-            conn.close()
-            st.dataframe(df_predictions)
-            st.download_button("Download Prediction Data", df_predictions.to_csv(index=False), "predictions.csv", "text/csv")
-            if st.button("Logout"):
-                st.session_state["logged_in"] = False
-                st.success("Logged out successfully!")
+        st.header("Please fill-up your personal information.")
 
+        # ... (rest of the code for loan prediction)
+        # Include the existing form and prediction logic here.
+
+        st.divider()
+        if st.button("Logout"):
+            logout()
+
+        if st.session_state["role"] == "admin":
+            if st.button("Download Database"):
+                if os.path.exists("loan_data.db"):
+                    with open("loan_data.db", "rb") as f:
+                        st.download_button(
+                            label="Download SQLite Database",
+                            data=f,
+                            file_name="loan_data.db",
+                            mime="application/octet-stream"
+                        )
+                else:
+                    st.error("Database file not found.")
         else:
-            st.header("Loan Prediction")
-
-            # Input fields for the loan prediction
-            Credit_History = st.selectbox("Credit History", ["Good", "Unclear Debts"])
-            Education = st.selectbox("Education", ["Graduate", "Not Graduate"])
-            ApplicantIncome = st.number_input("Applicant Income", min_value=0)
-            CoapplicantIncome = st.number_input("Coapplicant Income", min_value=0)
-            Loan_Amount_Term = st.number_input("Loan Amount Term (in months)", min_value=0)
-            Property_Area = st.selectbox("Property Area", ["Rural", "Semiurban", "Urban"])
-            Gender = st.selectbox("Gender", ["Male", "Female"])
-
-            # Show user input information
-            if st.button("Show Inputs"):
-                st.write(f"Credit History: {Credit_History}")
-                st.write(f"Education: {Education}")
-                st.write(f"Applicant Income: {ApplicantIncome}")
-                st.write(f"Coapplicant Income: {CoapplicantIncome}")
-                st.write(f"Loan Amount Term: {Loan_Amount_Term}")
-                st.write(f"Property Area: {Property_Area}")
-                st.write(f"Gender: {Gender}")
-
-            # Make a prediction when the user submits the form
-            if st.button("Predict Loan Approval"):
-                pred_label, raw_input_data, input_data_filtered, probabilities, shap_values = prediction(
-                    Credit_History, Education, ApplicantIncome, CoapplicantIncome, Loan_Amount_Term, Property_Area, Gender
-                )
-                
-                # Show prediction result
-                st.subheader(f"Loan Prediction Result: {pred_label}")
-                st.write(f"Prediction Probability: {probabilities[0][1]:.2f}")
-
-                # Show SHAP explanation plot
-                st.subheader("SHAP Explanation")
-                shap.summary_plot(shap_values, input_data_filtered)
-
-                # Save prediction data to database
-                customer_name = st.text_input("Enter your name for record:")
-                if customer_name and st.button("Save Prediction"):
-                    save_to_database(customer_name, Gender, Education, ApplicantIncome, CoapplicantIncome, Loan_Amount_Term, Property_Area, Credit_History, "Not Graduate" if Education == "Not Graduate" else "Graduate", ApplicantIncome, CoapplicantIncome, Loan_Amount_Term, pred_label)
-
-            # Logout button
-            if st.button("Logout"):
-                st.session_state["logged_in"] = False
-                st.success("Logged out successfully!")
+            st.info("Only admins can download the database.")
 
 if __name__ == "__main__":
     main()
