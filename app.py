@@ -114,34 +114,6 @@ def prediction(Credit_History, Education, ApplicantIncome, CoapplicantIncome, Lo
     pred_label = 'Approved' if prediction[0] == 1 else 'Rejected'
     return pred_label, raw_input_data, input_data_filtered, probabilities
 
-# Explanation function
-def explain_prediction(input_data_filtered, final_result):
-    masker = Independent(X_train_scaled)
-    explainer = shap.LinearExplainer(classifier, masker)
-    shap_values = explainer.shap_values(input_data_filtered)
-    shap_values_for_input = shap_values[0]
-
-    feature_names = input_data_filtered.columns
-    explanation_text = f"**Why your loan is {final_result}:**\n\n"
-    for feature, shap_value in zip(feature_names, shap_values_for_input):
-        explanation_text += (
-            f"- **{feature}**: {'Positive' if shap_value > 0 else 'Negative'} contribution with a SHAP value of {shap_value:.2f}\n"
-        )
-
-    if final_result == 'Rejected':
-        explanation_text += "\nThe loan was rejected because the negative contributions outweighed the positive ones."
-    else:
-        explanation_text += "\nThe loan was approved because the positive contributions outweighed the negative ones."
-
-    plt.figure(figsize=(8, 5))
-    plt.barh(feature_names, shap_values_for_input, color=["green" if val > 0 else "red" for val in shap_values_for_input])
-    plt.xlabel("SHAP Value (Impact on Prediction)")
-    plt.ylabel("Features")
-    plt.title("Feature Contributions to Prediction")
-    plt.tight_layout()
-
-    return explanation_text, plt
-
 # Login function
 def login():
     username = st.text_input("Username")
@@ -151,11 +123,11 @@ def login():
         if username == "admin" and password == "password":  # Replace with your credentials
             st.session_state["logged_in"] = True
             st.session_state["role"] = "admin"
-            st.success("Logged in as Admin! Please press login button.")
+            st.success("Logged in as Admin!")
         elif username == "user" and password == "password":  # Replace with user credentials
             st.session_state["logged_in"] = True
             st.session_state["role"] = "user"
-            st.success("Logged in as User! Please press login button.")
+            st.success("Logged in as User!")
         else:
             st.error("Invalid credentials")
 
@@ -169,34 +141,6 @@ def logout():
 def main():
     init_db()
 
-    st.markdown(
-        """
-        <style>
-        .main-container {
-            background-color: #f4f6f9;
-            border: 2px solid #e6e8eb;
-            padding: 20px;
-            border-radius: 10px;
-        }
-        .header {
-            background-color: #4caf50;
-            padding: 15px;
-            border-radius: 10px;
-            text-align: center;
-        }
-        .header h1 {
-            color: white;
-        }
-        </style>
-        <div class="main-container">
-        <div class="header">
-        <h1>Bank Loan Prediction ML App</h1>
-        </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
     if "logged_in" not in st.session_state:
         st.session_state["logged_in"] = False
         st.session_state["role"] = None
@@ -205,8 +149,7 @@ def main():
         st.header("Login")
         login()
     else:
-        st.header("Please fill-up your personal information.")
-
+        st.header("Loan Prediction")
         Customer_Name = st.text_input("Customer Name")
         Gender = st.selectbox("Gender", ("Male", "Female"))
         Married = st.selectbox("Married", ("Yes", "No"))
@@ -235,28 +178,33 @@ def main():
                 st.success(f"Prediction: **{result}**")
                 st.write("Probabilities (Rejected: 0, Approved: 1):", probabilities)
 
-                explanation_text, shap_plot = explain_prediction(processed_input, result)
-                st.markdown(explanation_text)
-                st.pyplot(shap_plot)
+                # SHAP Explanation
+                masker = Independent(X_train_scaled)
+                explainer = shap.LinearExplainer(classifier, masker)
+                shap_values = explainer.shap_values(processed_input)
+                shap_values_for_input = shap_values[0]
 
-        st.divider()
+                explanation_text = f"**Why your loan is {result}:**\n\n"
+                for feature, shap_value in zip(processed_input.columns, shap_values_for_input):
+                    explanation_text += (
+                        f"- **{feature}**: {'Positive' if shap_value > 0 else 'Negative'} contribution with a SHAP value of {shap_value:.2f}\n"
+                    )
+
+                st.markdown(explanation_text)
+
+                plt.figure(figsize=(8, 5))
+                plt.barh(
+                    processed_input.columns, 
+                    shap_values_for_input, 
+                    color=["green" if val > 0 else "red" for val in shap_values_for_input]
+                )
+                plt.xlabel("SHAP Value (Impact on Prediction)")
+                plt.ylabel("Features")
+                plt.title("Feature Contributions to Prediction")
+                st.pyplot(plt)
+
         if st.button("Logout"):
             logout()
-
-        if st.session_state["role"] == "admin":
-            if st.button("Download Database"):
-                if os.path.exists("loan_data.db"):
-                    with open("loan_data.db", "rb") as f:
-                        st.download_button(
-                            label="Download SQLite Database",
-                            data=f,
-                            file_name="loan_data.db",
-                            mime="application/octet-stream"
-                        )
-                else:
-                    st.error("Database file not found.")
-        else:
-            st.info("Only admins can download the database.")
 
 if __name__ == "__main__":
     main()
