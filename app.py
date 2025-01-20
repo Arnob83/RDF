@@ -62,14 +62,6 @@ def init_db():
         result TEXT
     )
     """)
-    
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        phone_number TEXT UNIQUE,
-        password TEXT
-    )
-    """)
     conn.commit()
     conn.close()
 
@@ -90,32 +82,6 @@ def save_to_database(customer_name, gender, married, dependents, self_employed, 
           loan_amount_term, result))
     conn.commit()
     conn.close()
-
-# Register new user
-def register_user(phone_number, password):
-    conn = sqlite3.connect("loan_data.db")
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO users (phone_number, password) VALUES (?, ?)", (phone_number, password))
-    conn.commit()
-    conn.close()
-
-# Authenticate user login
-def authenticate_user(phone_number, password):
-    admin_phone = "admin123"
-    admin_password = "adminpass"
-
-    if phone_number == admin_phone and password == admin_password:
-        return "admin"
-    else:
-        conn = sqlite3.connect("loan_data.db")
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM users WHERE phone_number = ? AND password = ?", (phone_number, password))
-        user = cursor.fetchone()
-        conn.close()
-        if user:
-            return "user"
-        else:
-            return None
 
 # Prediction function
 @st.cache_data
@@ -178,43 +144,25 @@ def explain_prediction(input_data_filtered, final_result):
 
 # Login function
 def login():
-    phone_number = st.text_input("Phone Number")
+    username = st.text_input("Username")
     password = st.text_input("Password", type="password")
 
     if st.button("Login"):
-        user_role = authenticate_user(phone_number, password)
-        if user_role:
+        if username == "admin" and password == "password":  # Replace with your credentials
             st.session_state["logged_in"] = True
-            st.session_state["role"] = user_role
-            st.session_state["phone_number"] = phone_number
-            st.success("Logged in successfully!")
+            st.session_state["role"] = "admin"
+            st.success("Logged in as Admin! Please press login button.")
+        elif username == "user" and password == "password":  # Replace with user credentials
+            st.session_state["logged_in"] = True
+            st.session_state["role"] = "user"
+            st.success("Logged in as User! Please press login button.")
         else:
             st.error("Invalid credentials")
-
-# Registration function
-def register():
-    phone_number = st.text_input("Phone Number")
-    password = st.text_input("Password", type="password")
-    confirm_password = st.text_input("Confirm Password", type="password")
-
-    if password != confirm_password:
-        st.error("Passwords do not match.")
-    elif st.button("Register"):
-        conn = sqlite3.connect("loan_data.db")
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM users WHERE phone_number = ?", (phone_number,))
-        if cursor.fetchone():
-            st.error("User already registered!")
-        else:
-            register_user(phone_number, password)
-            st.success("Registration successful! Please login.")
-        conn.close()
 
 # Logout function
 def logout():
     st.session_state["logged_in"] = False
     st.session_state["role"] = None
-    st.session_state["phone_number"] = None
     st.success("Logged out successfully")
 
 # Main Streamlit app
@@ -254,39 +202,11 @@ def main():
         st.session_state["role"] = None
 
     if not st.session_state["logged_in"]:
-        st.header("Login / Register")
-
-        option = st.selectbox("Choose an option", ["Login", "Register"])
-
-        if option == "Login":
-            login()
-        else:
-            register()
+        st.header("Login")
+        login()
     else:
-        if st.session_state["role"] == "admin":
-            st.header("Admin Panel")
+        st.header("Please fill-up your personal information.")
 
-            if st.button("Download Registration Database"):
-                conn = sqlite3.connect("loan_data.db")
-                cursor = conn.cursor()
-                cursor.execute("SELECT * FROM users")
-                user_data = cursor.fetchall()
-                df_users = pd.DataFrame(user_data, columns=["ID", "Phone Number", "Password"])
-
-                st.write(df_users)
-                conn.close()
-
-            if st.button("Download Prediction Database"):
-                conn = sqlite3.connect("loan_data.db")
-                cursor = conn.cursor()
-                cursor.execute("SELECT * FROM loan_predictions")
-                prediction_data = cursor.fetchall()
-                df_predictions = pd.DataFrame(prediction_data, columns=["ID", "Customer Name", "Gender", "Married", "Dependents", "Self Employed", "Loan Amount", "Property Area", "Credit History", "Education", "Applicant Income", "Coapplicant Income", "Loan Amount Term", "Result"])
-
-                st.write(df_predictions)
-                conn.close()
-
-        st.header("Loan Prediction Form")
         Customer_Name = st.text_input("Customer Name")
         Gender = st.selectbox("Gender", ("Male", "Female"))
         Married = st.selectbox("Married", ("Yes", "No"))
@@ -319,8 +239,24 @@ def main():
                 st.markdown(explanation_text)
                 st.pyplot(shap_plot)
 
+        st.divider()
         if st.button("Logout"):
             logout()
+
+        if st.session_state["role"] == "admin":
+            if st.button("Download Database"):
+                if os.path.exists("loan_data.db"):
+                    with open("loan_data.db", "rb") as f:
+                        st.download_button(
+                            label="Download SQLite Database",
+                            data=f,
+                            file_name="loan_data.db",
+                            mime="application/octet-stream"
+                        )
+                else:
+                    st.error("Database file not found.")
+        else:
+            st.info("Only admins can download the database.")
 
 if __name__ == "__main__":
     main()
