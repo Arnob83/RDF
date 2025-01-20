@@ -249,59 +249,61 @@ def main():
 
     if "logged_in" not in st.session_state:
         st.session_state["logged_in"] = False
+        st.session_state["role"] = None
 
-    if st.session_state["logged_in"]:
-        if st.button("Logout"):
-            logout()
+    if not st.session_state["logged_in"]:
+        st.header("Login / Register")
 
-        if st.session_state["role"] == "user":
-            st.header("Loan Prediction")
-            st.write("Welcome, user! Please fill the form to predict loan approval.")
-            
-            Customer_Name = st.text_input("Customer Name")
-            Gender = st.selectbox("Gender", ("Male", "Female"))
-            Married = st.selectbox("Married", ("Yes", "No"))
-            Dependents = st.selectbox("Dependents", (0, 1, 2, 3, 4, 5))
-            Self_Employed = st.selectbox("Self Employed", ("Yes", "No"))
-            Loan_Amount = st.number_input("Loan Amount", min_value=0.0)
-            Property_Area = st.selectbox("Property Area", ("Urban", "Rural", "Semi-urban"))
-            Credit_History = st.selectbox("Credit History", ("Unclear Debts", "Clear Debts"))
-            Education = st.selectbox('Education', ("Under_Graduate", "Graduate"))
-            ApplicantIncome = st.number_input("Applicant's yearly Income", min_value=0.0)
-            CoapplicantIncome = st.number_input("Co-applicant's yearly Income", min_value=0.0)
-            Loan_Amount_Term = st.number_input("Loan Amount Term (in months)", min_value=0)
-
-            if st.button("Predict Loan Approval"):
-                if not Customer_Name:
-                    st.error("Please enter the customer's name.")
-                else:
-                    # Prediction
-                    result, raw_input, processed_input, probabilities = prediction(
-                        Credit_History, Education, ApplicantIncome, CoapplicantIncome, Loan_Amount_Term, Property_Area, Gender
-                    )
-
-                    # Save the prediction to the database
-                    save_to_database(Customer_Name, Gender, Married, Dependents, Self_Employed, Loan_Amount, Property_Area, 
-                                     Credit_History, Education, ApplicantIncome, CoapplicantIncome, 
-                                     Loan_Amount_Term, result)
-
-                    # Display results
-                    st.success(f"Prediction: **{result}**")
-                    st.write("Probabilities (Rejected: 0, Approved: 1):", probabilities)
-
-                    # Explain the prediction
-                    explanation_text, shap_plot = explain_prediction(processed_input, result)
-                    st.markdown(explanation_text)
-                    st.pyplot(shap_plot)
-
-    elif not st.session_state["logged_in"]:
-        st.sidebar.header("User Login/Register")
-
-        option = st.sidebar.selectbox("Select an option", ("Login", "Register"))
+        option = st.selectbox("Select an option", ("Login", "Register"))
         if option == "Login":
             login()
         else:
             register()
+
+    elif st.session_state["role"] == "user":
+        st.header("Loan Prediction")
+        st.write("Welcome, user! Please fill the form to predict loan approval.")
+        
+        # User form inputs here...
+
+        # Logout button for the user
+        if st.button("Logout"):
+            logout()
+
+    elif st.session_state["role"] == "admin":
+        st.header("Admin Panel")
+        
+        # Admin form inputs here...
+
+        # Logout button for the admin
+        if st.button("Logout"):
+            logout()
+
+        # Admin can download databases here...
+        # Download Prediction and Registration Database for Admin
+        if st.button("Download Registration Database"):
+            if os.path.exists("loan_data.db"):
+                with open("loan_data.db", "rb") as f:
+                    st.download_button(
+                        label="Download Registration Database",
+                        data=f,
+                        file_name="loan_data.db",
+                        mime="application/octet-stream"
+                    )
+            else:
+                st.error("Database file not found.")
+
+        if st.button("Download Prediction Database"):
+            if os.path.exists("loan_data.db"):
+                with open("loan_data.db", "rb") as f:
+                    st.download_button(
+                        label="Download Prediction Database",
+                        data=f,
+                        file_name="loan_data.db",
+                        mime="application/octet-stream"
+                    )
+            else:
+                st.error("Prediction database file not found.")
 
 if __name__ == "__main__":
     main()
