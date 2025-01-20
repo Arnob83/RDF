@@ -8,6 +8,10 @@ import os
 import shap
 from shap.maskers import Independent
 
+# Admin credentials (you can modify these as required)
+ADMIN_PHONE = "admin_phone"
+ADMIN_PASSWORD = "admin_password"
+
 # URLs for the model and scaler files in your GitHub repository
 model_url = "https://raw.githubusercontent.com/Arnob83/RDF/main/Logistic_Regression_model.pkl"
 scaler_url = "https://raw.githubusercontent.com/Arnob83/RDF/main/scaler.pkl"
@@ -67,8 +71,7 @@ def init_db():
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         phone_number TEXT UNIQUE,
-        password TEXT,
-        role TEXT
+        password TEXT
     )
     """)
     conn.commit()
@@ -92,11 +95,14 @@ def save_to_database(customer_name, gender, married, dependents, self_employed, 
     conn.commit()
     conn.close()
 
-# Register new user with role
-def register_user(phone_number, password, role):
+# Register new user
+def register_user(phone_number, password):
+    if phone_number == ADMIN_PHONE:
+        st.error("Admin user cannot be registered through this form.")
+        return
     conn = sqlite3.connect("loan_data.db")
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO users (phone_number, password, role) VALUES (?, ?, ?)", (phone_number, password, role))
+    cursor.execute("INSERT INTO users (phone_number, password) VALUES (?, ?)", (phone_number, password))
     conn.commit()
     conn.close()
 
@@ -107,6 +113,10 @@ def authenticate_user(phone_number, password):
     cursor.execute("SELECT * FROM users WHERE phone_number = ? AND password = ?", (phone_number, password))
     user = cursor.fetchone()
     conn.close()
+
+    if phone_number == ADMIN_PHONE and password == ADMIN_PASSWORD:
+        # Return a special role for the admin user
+        return {"role": "admin", "phone_number": phone_number}
     return user
 
 # Prediction function
@@ -177,8 +187,8 @@ def login():
         user = authenticate_user(phone_number, password)
         if user:
             st.session_state["logged_in"] = True
-            st.session_state["role"] = user[3]  # Role is stored in the 4th column
             st.session_state["phone_number"] = phone_number
+            st.session_state["role"] = user["role"] if isinstance(user, dict) else "user"
             st.success("Logged in successfully!")
         else:
             st.error("Invalid credentials")
@@ -196,8 +206,7 @@ def register():
         if user:
             st.error("User already registered!")
         else:
-            role = "admin" if phone_number == "admin" else "user"  # Assign admin role for phone number 'admin'
-            register_user(phone_number, password, role)
+            register_user(phone_number, password)
             st.success("Registration successful! Please login.")
 
 # Logout function
@@ -243,69 +252,57 @@ def main():
         st.session_state["logged_in"] = False
         st.session_state["role"] = None
 
-    if not st.session_state["logged_in"]:
-        st.header("Login / Register")
-
-        option = st.selectbox("Choose an option", ["Login", "Register"])
-
-        if option == "Login":
-            login()
-        else:
-            register()
-
-    else:
-        st.header("Please fill-up your personal information.")
-
-        Customer_Name = st.text_input("Customer Name")
-        Gender = st.selectbox("Gender", ("Male", "Female"))
-        Married = st.selectbox("Married", ("Yes", "No"))
-        Dependents = st.selectbox("Dependents", (0, 1, 2, 3, 4, 5))
-        Self_Employed = st.selectbox("Self Employed", ("Yes", "No"))
-        Loan_Amount = st.number_input("Loan Amount", min_value=0.0)
-        Property_Area = st.selectbox("Property Area", ("Urban", "Rural", "Semi-urban"))
-        Credit_History = st.selectbox("Credit History", ("Unclear Debts", "Clear Debts"))
-        Education = st.selectbox('Education', ("Under_Graduate", "Graduate"))
-        ApplicantIncome = st.number_input("Applicant's yearly Income", min_value=0.0)
-        CoapplicantIncome = st.number_input("Co-applicant's yearly Income", min_value=0.0)
-        Loan_Amount_Term = st.number_input("Loan Amount Term (in months)", min_value=0)
-
-        if st.button("Predict Loan Approval"):
-            if not Customer_Name:
-                st.error("Please enter the customer's name.")
-            else:
-                result, raw_input, processed_input, probabilities = prediction(
-                    Credit_History, Education, ApplicantIncome, CoapplicantIncome, Loan_Amount_Term, Property_Area, Gender
-                )
-
-                save_to_database(Customer_Name, Gender, Married, Dependents, Self_Employed, Loan_Amount, Property_Area, 
-                                 Credit_History, Education, ApplicantIncome, CoapplicantIncome, 
-                                 Loan_Amount_Term, result)
-
-                st.success(f"Prediction: **{result}**")
-                st.write("Probabilities (Rejected: 0, Approved: 1):", probabilities)
-
-                explanation_text, shap_plot = explain_prediction(processed_input, result)
-                st.markdown(explanation_text)
-                st.pyplot(shap_plot)
-
-        st.divider()
-        if st.button("Logout"):
-            logout()
+    if st.session_state["logged_in"]:
+        st.write(f"Welcome {st.session_state['phone_number']}!")
 
         if st.session_state["role"] == "admin":
-            if st.button("Download Database"):
-                if os.path.exists("loan_data.db"):
-                    with open("loan_data.db", "rb") as f:
-                        st.download_button(
-                            label="Download SQLite Database",
-                            data=f,
-                            file_name="loan_data.db",
-                            mime="application/octet-stream"
-                        )
-                else:
-                    st.error("Database file not found.")
+            st.header("Admin Panel")
+            st.write("You have admin access.")
+
+            # Display database data
+            conn = sqlite3.connect("loan_data.db")
+            query = pd.read_sql_query("SELECT * FROM loan_predictions", conn)
+            st.write(query)
+            conn.close()
+
+            if st.button("Download Data as CSV"):
+                query.to_csv("loan_predictions.csv", index=False)
+                st.success("Data downloaded successfully.")
+
         else:
-            st.info("Only admins can download the database.")
+            st.header("User Panel")
+            # Collect input data for prediction
+            customer_name = st.text_input("Customer Name")
+            gender = st.selectbox("Gender", ["Male", "Female"])
+            married = st.selectbox("Married", ["Yes", "No"])
+            dependents = st.number_input("Dependents", 0, 10)
+            self_employed = st.selectbox("Self Employed", ["Yes", "No"])
+            loan_amount = st.number_input("Loan Amount", 0, 1000000)
+            property_area = st.selectbox("Property Area", ["Urban", "Semiurban", "Rural"])
+            credit_history = st.selectbox("Credit History", ["Clear Debts", "Unclear Debts"])
+            education = st.selectbox("Education", ["Graduate", "Not Graduate"])
+            applicant_income = st.number_input("Applicant Income", 0, 1000000)
+            coapplicant_income = st.number_input("Coapplicant Income", 0, 1000000)
+            loan_amount_term = st.number_input("Loan Amount Term", 12, 480)
+
+            if st.button("Predict Loan Eligibility"):
+                final_result, raw_input_data, input_data_filtered, probabilities = prediction(
+                    credit_history, education, applicant_income, coapplicant_income, 
+                    loan_amount_term, property_area, gender
+                )
+
+                st.write(f"Loan Prediction: {final_result}")
+                explanation_text, shap_plot = explain_prediction(input_data_filtered, final_result)
+                st.write(explanation_text)
+                st.pyplot(shap_plot)
+                
+                # Save prediction to database
+                save_to_database(customer_name, gender, married, dependents, self_employed, loan_amount, property_area, 
+                                 credit_history, education, applicant_income, coapplicant_income, 
+                                 loan_amount_term, final_result)
+                
+    else:
+        login()
 
 if __name__ == "__main__":
     main()
