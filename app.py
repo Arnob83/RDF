@@ -249,18 +249,15 @@ def main():
 
     if "logged_in" not in st.session_state:
         st.session_state["logged_in"] = False
-        st.session_state["role"] = None
 
     if not st.session_state["logged_in"]:
         st.header("Login / Register")
-
         option = st.selectbox("Choose an option", ["Login", "Register"])
 
         if option == "Login":
             login()
         else:
             register()
-
     else:
         if st.session_state["role"] == "user":
             st.header("Please fill-up your personal information.")
@@ -270,7 +267,7 @@ def main():
         elif st.session_state["role"] == "admin":
             st.header("Admin Panel")
             st.subheader("Loan Prediction Application Form")
-
+            
             # Admin can view and download the database
             if st.button("Download Database"):
                 if os.path.exists("loan_data.db"):
