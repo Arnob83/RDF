@@ -200,12 +200,15 @@ def register():
     if password != confirm_password:
         st.error("Passwords do not match.")
     elif st.button("Register"):
-        user_role = authenticate_user(phone_number, password)
-        if user_role:
+        conn = sqlite3.connect("loan_data.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE phone_number = ?", (phone_number,))
+        if cursor.fetchone():
             st.error("User already registered!")
         else:
             register_user(phone_number, password)
             st.success("Registration successful! Please login.")
+        conn.close()
 
 # Logout function
 def logout():
@@ -264,28 +267,24 @@ def main():
             st.header("Admin Panel")
 
             if st.button("Download Registration Database"):
-                if os.path.exists("loan_data.db"):
-                    with open("loan_data.db", "rb") as f:
-                        st.download_button(
-                            label="Download Registration Database",
-                            data=f,
-                            file_name="loan_data.db",
-                            mime="application/octet-stream"
-                        )
-                else:
-                    st.error("Database file not found.")
+                conn = sqlite3.connect("loan_data.db")
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM users")
+                user_data = cursor.fetchall()
+                df_users = pd.DataFrame(user_data, columns=["ID", "Phone Number", "Password"])
+
+                st.write(df_users)
+                conn.close()
 
             if st.button("Download Prediction Database"):
-                if os.path.exists("loan_data.db"):
-                    with open("loan_data.db", "rb") as f:
-                        st.download_button(
-                            label="Download Prediction Database",
-                            data=f,
-                            file_name="loan_predictions.db",
-                            mime="application/octet-stream"
-                        )
-                else:
-                    st.error("Prediction database file not found.")
+                conn = sqlite3.connect("loan_data.db")
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM loan_predictions")
+                prediction_data = cursor.fetchall()
+                df_predictions = pd.DataFrame(prediction_data, columns=["ID", "Customer Name", "Gender", "Married", "Dependents", "Self Employed", "Loan Amount", "Property Area", "Credit History", "Education", "Applicant Income", "Coapplicant Income", "Loan Amount Term", "Result"])
+
+                st.write(df_predictions)
+                conn.close()
 
         st.header("Loan Prediction Form")
         Customer_Name = st.text_input("Customer Name")
