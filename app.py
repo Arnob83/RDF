@@ -201,8 +201,46 @@ def main():
 
         else:
             st.header("Loan Prediction")
-            # Prediction inputs
-            # (Code here for loan prediction form and SHAP explanation)
+
+            # Input fields for the loan prediction
+            Credit_History = st.selectbox("Credit History", ["Good", "Unclear Debts"])
+            Education = st.selectbox("Education", ["Graduate", "Not Graduate"])
+            ApplicantIncome = st.number_input("Applicant Income", min_value=0)
+            CoapplicantIncome = st.number_input("Coapplicant Income", min_value=0)
+            Loan_Amount_Term = st.number_input("Loan Amount Term (in months)", min_value=0)
+            Property_Area = st.selectbox("Property Area", ["Rural", "Semiurban", "Urban"])
+            Gender = st.selectbox("Gender", ["Male", "Female"])
+
+            # Show user input information
+            if st.button("Show Inputs"):
+                st.write(f"Credit History: {Credit_History}")
+                st.write(f"Education: {Education}")
+                st.write(f"Applicant Income: {ApplicantIncome}")
+                st.write(f"Coapplicant Income: {CoapplicantIncome}")
+                st.write(f"Loan Amount Term: {Loan_Amount_Term}")
+                st.write(f"Property Area: {Property_Area}")
+                st.write(f"Gender: {Gender}")
+
+            # Make a prediction when the user submits the form
+            if st.button("Predict Loan Approval"):
+                pred_label, raw_input_data, input_data_filtered, probabilities, shap_values = prediction(
+                    Credit_History, Education, ApplicantIncome, CoapplicantIncome, Loan_Amount_Term, Property_Area, Gender
+                )
+                
+                # Show prediction result
+                st.subheader(f"Loan Prediction Result: {pred_label}")
+                st.write(f"Prediction Probability: {probabilities[0][1]:.2f}")
+
+                # Show SHAP explanation plot
+                st.subheader("SHAP Explanation")
+                shap.summary_plot(shap_values, input_data_filtered)
+
+                # Save prediction data to database
+                customer_name = st.text_input("Enter your name for record:")
+                if customer_name and st.button("Save Prediction"):
+                    save_to_database(customer_name, Gender, Education, ApplicantIncome, CoapplicantIncome, Loan_Amount_Term, Property_Area, Credit_History, "Not Graduate" if Education == "Not Graduate" else "Graduate", ApplicantIncome, CoapplicantIncome, Loan_Amount_Term, pred_label)
+
+            # Logout button
             if st.button("Logout"):
                 st.session_state["logged_in"] = False
                 st.success("Logged out successfully!")
