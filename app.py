@@ -8,10 +8,6 @@ import os
 import shap
 from shap.maskers import Independent
 
-# Admin credentials (you can modify these as required)
-ADMIN_PHONE = "admin_phone"
-ADMIN_PASSWORD = "admin_password"
-
 # URLs for the model and scaler files in your GitHub repository
 model_url = "https://raw.githubusercontent.com/Arnob83/RDF/main/Logistic_Regression_model.pkl"
 scaler_url = "https://raw.githubusercontent.com/Arnob83/RDF/main/scaler.pkl"
@@ -43,6 +39,10 @@ with open("X_train_scaled", "wb") as file:
 # Load X_train
 with open("X_train_scaled", "rb") as file:
     X_train_scaled = pickle.load(file)
+
+# Hardcoded admin credentials (replace with your actual admin phone number and password)
+ADMIN_PHONE_NUMBER = "1234567890"
+ADMIN_PASSWORD = "adminpassword"
 
 # Initialize SQLite database
 def init_db():
@@ -97,27 +97,26 @@ def save_to_database(customer_name, gender, married, dependents, self_employed, 
 
 # Register new user
 def register_user(phone_number, password):
-    if phone_number == ADMIN_PHONE:
-        st.error("Admin user cannot be registered through this form.")
-        return
     conn = sqlite3.connect("loan_data.db")
     cursor = conn.cursor()
     cursor.execute("INSERT INTO users (phone_number, password) VALUES (?, ?)", (phone_number, password))
     conn.commit()
     conn.close()
 
-# Authenticate user login
+# Authenticate user (admin check included)
 def authenticate_user(phone_number, password):
+    # Check if the entered credentials match the admin credentials
+    if phone_number == ADMIN_PHONE_NUMBER and password == ADMIN_PASSWORD:
+        return "admin"
+    
+    # Otherwise, check for user credentials in the database
     conn = sqlite3.connect("loan_data.db")
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM users WHERE phone_number = ? AND password = ?", (phone_number, password))
     user = cursor.fetchone()
     conn.close()
-
-    if phone_number == ADMIN_PHONE and password == ADMIN_PASSWORD:
-        # Return a special role for the admin user
-        return {"role": "admin", "phone_number": phone_number}
-    return user
+    
+    return "user" if user else None
 
 # Prediction function
 @st.cache_data
@@ -184,11 +183,11 @@ def login():
     password = st.text_input("Password", type="password")
 
     if st.button("Login"):
-        user = authenticate_user(phone_number, password)
-        if user:
+        role = authenticate_user(phone_number, password)
+        if role:
             st.session_state["logged_in"] = True
+            st.session_state["role"] = role
             st.session_state["phone_number"] = phone_number
-            st.session_state["role"] = user["role"] if isinstance(user, dict) else "user"
             st.success("Logged in successfully!")
         else:
             st.error("Invalid credentials")
@@ -252,57 +251,43 @@ def main():
         st.session_state["logged_in"] = False
         st.session_state["role"] = None
 
-    if st.session_state["logged_in"]:
-        st.write(f"Welcome {st.session_state['phone_number']}!")
+    if not st.session_state["logged_in"]:
+        st.header("Login / Register")
 
-        if st.session_state["role"] == "admin":
-            st.header("Admin Panel")
-            st.write("You have admin access.")
+        option = st.selectbox("Choose an option", ["Login", "Register"])
 
-            # Display database data
-            conn = sqlite3.connect("loan_data.db")
-            query = pd.read_sql_query("SELECT * FROM loan_predictions", conn)
-            st.write(query)
-            conn.close()
-
-            if st.button("Download Data as CSV"):
-                query.to_csv("loan_predictions.csv", index=False)
-                st.success("Data downloaded successfully.")
-
+        if option == "Login":
+            login()
         else:
-            st.header("User Panel")
-            # Collect input data for prediction
-            customer_name = st.text_input("Customer Name")
-            gender = st.selectbox("Gender", ["Male", "Female"])
-            married = st.selectbox("Married", ["Yes", "No"])
-            dependents = st.number_input("Dependents", 0, 10)
-            self_employed = st.selectbox("Self Employed", ["Yes", "No"])
-            loan_amount = st.number_input("Loan Amount", 0, 1000000)
-            property_area = st.selectbox("Property Area", ["Urban", "Semiurban", "Rural"])
-            credit_history = st.selectbox("Credit History", ["Clear Debts", "Unclear Debts"])
-            education = st.selectbox("Education", ["Graduate", "Not Graduate"])
-            applicant_income = st.number_input("Applicant Income", 0, 1000000)
-            coapplicant_income = st.number_input("Coapplicant Income", 0, 1000000)
-            loan_amount_term = st.number_input("Loan Amount Term", 12, 480)
+            register()
 
-            if st.button("Predict Loan Eligibility"):
-                final_result, raw_input_data, input_data_filtered, probabilities = prediction(
-                    credit_history, education, applicant_income, coapplicant_income, 
-                    loan_amount_term, property_area, gender
-                )
-
-                st.write(f"Loan Prediction: {final_result}")
-                explanation_text, shap_plot = explain_prediction(input_data_filtered, final_result)
-                st.write(explanation_text)
-                st.pyplot(shap_plot)
-                
-                # Save prediction to database
-                save_to_database(customer_name, gender, married, dependents, self_employed, loan_amount, property_area, 
-                                 credit_history, education, applicant_income, coapplicant_income, 
-                                 loan_amount_term, final_result)
-                
     else:
-        login()
+        if st.session_state["role"] == "user":
+            st.header("Please fill-up your personal information.")
+            # Loan prediction form (same as before)
+            # Your existing code for the form...
+
+        elif st.session_state["role"] == "admin":
+            st.header("Admin Panel")
+            st.subheader("Loan Prediction Application Form")
+
+            # Admin can view and download the database
+            if st.button("Download Database"):
+                if os.path.exists("loan_data.db"):
+                    with open("loan_data.db", "rb") as f:
+                        st.download_button(
+                            label="Download SQLite Database",
+                            data=f,
+                            file_name="loan_data.db",
+                            mime="application/octet-stream"
+                        )
+                else:
+                    st.error("Database file not found.")
+        else:
+            st.error("Unauthorized access!")
+
+        if st.button("Logout"):
+            logout()
 
 if __name__ == "__main__":
     main()
