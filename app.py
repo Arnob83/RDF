@@ -240,11 +240,11 @@ def main():
         </style>
         <div class="main-container">
         <div class="header">
-        <h1>Bank Loan Prediction ML App</h1>
+        <h1>Loan Prediction Application</h1>
         </div>
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
     if "logged_in" not in st.session_state:
@@ -261,8 +261,8 @@ def main():
     else:
         if st.session_state["role"] == "user":
             st.header("Please fill-up your personal information.")
-            # Loan prediction form (same as before)
-            # Your existing code for the form...
+            # Add user-specific form here for loan prediction
+            # (e.g., form to collect loan data)
 
         elif st.session_state["role"] == "admin":
             st.header("Admin Panel")
