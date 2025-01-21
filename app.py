@@ -89,10 +89,10 @@ def save_to_database(customer_name, gender, married, dependents, self_employed, 
     conn.commit()
     conn.close()
 
-# Text generation function
+# Text generation function (Updated to use gpt-3.5-turbo or gpt-4)
 def generate_explanation_and_suggestions(features, shap_values, final_result):
     if final_result == "Rejected":
-        base_prompt = """
+        base_prompt = f"""
         A user has applied for a loan, but their application was rejected. 
         Here are the SHAP feature contributions to the rejection:
 
@@ -101,15 +101,24 @@ def generate_explanation_and_suggestions(features, shap_values, final_result):
 
         Based on the above, explain to the user why their loan was rejected. 
         Also, provide actionable suggestions to improve their chances of loan approval in the future.
-        """.format(features=features, shap_values=shap_values)
-
-        response = openai.Completion.create(
-            engine="text-davinci-003",  # Or use a relevant model
-            prompt=base_prompt,
-            max_tokens=300,
-            temperature=0.7
-        )
-        explanation_and_suggestions = response["choices"][0]["text"].strip()
+        """
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",  # Updated model
+                messages=[
+                    {"role": "system", "content": "You are an assistant that explains loan rejections and provides actionable suggestions."},
+                    {"role": "user", "content": base_prompt},
+                ],
+                max_tokens=300,
+                temperature=0.7
+            )
+            explanation_and_suggestions = response["choices"][0]["message"]["content"].strip()
+        except openai.error.AuthenticationError:
+            explanation_and_suggestions = "Authentication error with OpenAI API. Please check your API key."
+        except openai.error.RateLimitError:
+            explanation_and_suggestions = "Rate limit exceeded. Please try again later."
+        except openai.error.OpenAIError as e:
+            explanation_and_suggestions = f"An error occurred with OpenAI API: {str(e)}"
     else:
         explanation_and_suggestions = "Congratulations! Your loan application was approved. Keep up the good financial behavior."
 
@@ -162,7 +171,7 @@ def explain_prediction(input_data_filtered, final_result):
             f"- **{feature}**: {'Positive' if shap_value > 0 else 'Negative'} contribution with a SHAP value of {shap_value:.2f}\n"
         )
 
-    # Generate suggestions using the text generation model
+    # Generate suggestions using the updated text generation model
     suggestions = generate_explanation_and_suggestions(features_with_values, shap_values_for_input, final_result)
 
     if final_result == 'Rejected':
