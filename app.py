@@ -7,6 +7,10 @@ import requests
 import os
 import shap
 from shap.maskers import Independent
+import openai
+
+# Set your OpenAI API Key
+openai.api_key = "your_openai_api_key"  # Replace with your OpenAI API Key
 
 # URLs for the model and scaler files in your GitHub repository
 model_url = "https://raw.githubusercontent.com/Arnob83/RDF/main/Logistic_Regression_model.pkl"
@@ -83,6 +87,32 @@ def save_to_database(customer_name, gender, married, dependents, self_employed, 
     conn.commit()
     conn.close()
 
+# Text generation function
+def generate_explanation_and_suggestions(features, shap_values, final_result):
+    if final_result == "Rejected":
+        base_prompt = """
+        A user has applied for a loan, but their application was rejected. 
+        Here are the SHAP feature contributions to the rejection:
+
+        Features: {features}
+        SHAP Values: {shap_values}
+
+        Based on the above, explain to the user why their loan was rejected. 
+        Also, provide actionable suggestions to improve their chances of loan approval in the future.
+        """.format(features=features, shap_values=shap_values)
+
+        response = openai.Completion.create(
+            engine="text-davinci-003",  # Or use a relevant model
+            prompt=base_prompt,
+            max_tokens=300,
+            temperature=0.7
+        )
+        explanation_and_suggestions = response["choices"][0]["text"].strip()
+    else:
+        explanation_and_suggestions = "Congratulations! Your loan application was approved. Keep up the good financial behavior."
+
+    return explanation_and_suggestions
+
 # Prediction function
 @st.cache_data
 def prediction(Credit_History, Education, ApplicantIncome, CoapplicantIncome, Loan_Amount_Term, Property_Area, Gender):
@@ -122,11 +152,16 @@ def explain_prediction(input_data_filtered, final_result):
     shap_values_for_input = shap_values[0]
 
     feature_names = input_data_filtered.columns
+    features_with_values = {feature: round(value, 2) for feature, value in zip(feature_names, shap_values_for_input)}
+
     explanation_text = f"**Why your loan is {final_result}:**\n\n"
     for feature, shap_value in zip(feature_names, shap_values_for_input):
         explanation_text += (
             f"- **{feature}**: {'Positive' if shap_value > 0 else 'Negative'} contribution with a SHAP value of {shap_value:.2f}\n"
         )
+
+    # Generate suggestions using the text generation model
+    suggestions = generate_explanation_and_suggestions(features_with_values, shap_values_for_input, final_result)
 
     if final_result == 'Rejected':
         explanation_text += "\nThe loan was rejected because the negative contributions outweighed the positive ones."
@@ -140,7 +175,7 @@ def explain_prediction(input_data_filtered, final_result):
     plt.title("Feature Contributions to Prediction")
     plt.tight_layout()
 
-    return explanation_text, plt
+    return explanation_text, suggestions, plt
 
 # Login function
 def login():
@@ -235,9 +270,14 @@ def main():
                 st.success(f"Prediction: **{result}**")
                 st.write("Probabilities (Rejected: 0, Approved: 1):", probabilities)
 
-                explanation_text, shap_plot = explain_prediction(processed_input, result)
+                explanation_text, suggestions, shap_plot = explain_prediction(processed_input, result)
                 st.markdown(explanation_text)
                 st.pyplot(shap_plot)
+
+                # Display text generation output
+                if result == "Rejected":
+                    st.markdown("### Suggestions for Improving Loan Approval Chances")
+                    st.write(suggestions)
 
         st.divider()
         if st.button("Logout"):
@@ -260,4 +300,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-        
