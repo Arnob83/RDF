@@ -9,8 +9,10 @@ import shap
 from shap.maskers import Independent
 import openai
 
-# Set your OpenAI API Key
-openai.api_key = "your_openai_api_key"  # Replace with your OpenAI API Key
+openai.api_key = st.secrets["OPENAI_API_KEY"]
+
+if not openai.api_key:
+    st.error("OpenAI API key not found in secrets. Please set it in the Streamlit Cloud Secrets.")
 
 # URLs for the model and scaler files in your GitHub repository
 model_url = "https://raw.githubusercontent.com/Arnob83/RDF/main/Logistic_Regression_model.pkl"
