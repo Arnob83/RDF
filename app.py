@@ -7,12 +7,6 @@ import requests
 import os
 import shap
 from shap.maskers import Independent
-import openai
-
-openai.api_key = st.secrets["OPENAI_API_KEY"]
-
-if not openai.api_key:
-    st.error("OpenAI API key not found in secrets. Please set it in the Streamlit Cloud Secrets.")
 
 # URLs for the model and scaler files in your GitHub repository
 model_url = "https://raw.githubusercontent.com/Arnob83/RDF/main/Logistic_Regression_model.pkl"
@@ -68,6 +62,14 @@ def init_db():
         result TEXT
     )
     """)
+    
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        phone_number TEXT UNIQUE,
+        password TEXT
+    )
+    """)
     conn.commit()
     conn.close()
 
@@ -89,40 +91,31 @@ def save_to_database(customer_name, gender, married, dependents, self_employed, 
     conn.commit()
     conn.close()
 
-# Text generation function (Updated to use gpt-3.5-turbo or gpt-4)
-def generate_explanation_and_suggestions(features, shap_values, final_result):
-    if final_result == "Rejected":
-        base_prompt = f"""
-        A user has applied for a loan, but their application was rejected. 
-        Here are the SHAP feature contributions to the rejection:
+# Register new user
+def register_user(phone_number, password):
+    conn = sqlite3.connect("loan_data.db")
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO users (phone_number, password) VALUES (?, ?)", (phone_number, password))
+    conn.commit()
+    conn.close()
 
-        Features: {features}
-        SHAP Values: {shap_values}
+# Authenticate user login
+def authenticate_user(phone_number, password):
+    admin_phone = "admin123"
+    admin_password = "adminpass"
 
-        Based on the above, explain to the user why their loan was rejected. 
-        Also, provide actionable suggestions to improve their chances of loan approval in the future.
-        """
-        try:
-            response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",  # Updated model
-                messages=[
-                    {"role": "system", "content": "You are an assistant that explains loan rejections and provides actionable suggestions."},
-                    {"role": "user", "content": base_prompt},
-                ],
-                max_tokens=300,
-                temperature=0.7
-            )
-            explanation_and_suggestions = response["choices"][0]["message"]["content"].strip()
-        except openai.error.AuthenticationError:
-            explanation_and_suggestions = "Authentication error with OpenAI API. Please check your API key."
-        except openai.error.RateLimitError:
-            explanation_and_suggestions = "Rate limit exceeded. Please try again later."
-        except openai.error.OpenAIError as e:
-            explanation_and_suggestions = f"An error occurred with OpenAI API: {str(e)}"
+    if phone_number == admin_phone and password == admin_password:
+        return "admin"
     else:
-        explanation_and_suggestions = "Congratulations! Your loan application was approved. Keep up the good financial behavior."
-
-    return explanation_and_suggestions
+        conn = sqlite3.connect("loan_data.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE phone_number = ? AND password = ?", (phone_number, password))
+        user = cursor.fetchone()
+        conn.close()
+        if user:
+            return "user"
+        else:
+            return None
 
 # Prediction function
 @st.cache_data
@@ -163,16 +156,11 @@ def explain_prediction(input_data_filtered, final_result):
     shap_values_for_input = shap_values[0]
 
     feature_names = input_data_filtered.columns
-    features_with_values = {feature: round(value, 2) for feature, value in zip(feature_names, shap_values_for_input)}
-
     explanation_text = f"**Why your loan is {final_result}:**\n\n"
     for feature, shap_value in zip(feature_names, shap_values_for_input):
         explanation_text += (
             f"- **{feature}**: {'Positive' if shap_value > 0 else 'Negative'} contribution with a SHAP value of {shap_value:.2f}\n"
         )
-
-    # Generate suggestions using the updated text generation model
-    suggestions = generate_explanation_and_suggestions(features_with_values, shap_values_for_input, final_result)
 
     if final_result == 'Rejected':
         explanation_text += "\nThe loan was rejected because the negative contributions outweighed the positive ones."
@@ -186,29 +174,47 @@ def explain_prediction(input_data_filtered, final_result):
     plt.title("Feature Contributions to Prediction")
     plt.tight_layout()
 
-    return explanation_text, suggestions, plt
+    return explanation_text, plt
 
 # Login function
 def login():
-    username = st.text_input("Username")
+    phone_number = st.text_input("Phone Number")
     password = st.text_input("Password", type="password")
 
     if st.button("Login"):
-        if username == "admin" and password == "password":  # Replace with your credentials
+        user_role = authenticate_user(phone_number, password)
+        if user_role:
             st.session_state["logged_in"] = True
-            st.session_state["role"] = "admin"
-            st.success("Logged in as Admin! Please press login button.")
-        elif username == "user" and password == "password":  # Replace with user credentials
-            st.session_state["logged_in"] = True
-            st.session_state["role"] = "user"
-            st.success("Logged in as User! Please press login button.")
+            st.session_state["role"] = user_role
+            st.session_state["phone_number"] = phone_number
+            st.success("Logged in successfully!")
         else:
             st.error("Invalid credentials")
+
+# Registration function
+def register():
+    phone_number = st.text_input("Phone Number")
+    password = st.text_input("Password", type="password")
+    confirm_password = st.text_input("Confirm Password", type="password")
+
+    if password != confirm_password:
+        st.error("Passwords do not match.")
+    elif st.button("Register"):
+        conn = sqlite3.connect("loan_data.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE phone_number = ?", (phone_number,))
+        if cursor.fetchone():
+            st.error("User already registered!")
+        else:
+            register_user(phone_number, password)
+            st.success("Registration successful! Please login.")
+        conn.close()
 
 # Logout function
 def logout():
     st.session_state["logged_in"] = False
     st.session_state["role"] = None
+    st.session_state["phone_number"] = None
     st.success("Logged out successfully")
 
 # Main Streamlit app
@@ -248,11 +254,39 @@ def main():
         st.session_state["role"] = None
 
     if not st.session_state["logged_in"]:
-        st.header("Login")
-        login()
-    else:
-        st.header("Please fill-up your personal information.")
+        st.header("Login / Register")
 
+        option = st.selectbox("Choose an option", ["Login", "Register"])
+
+        if option == "Login":
+            login()
+        else:
+            register()
+    else:
+        if st.session_state["role"] == "admin":
+            st.header("Admin Panel")
+
+            if st.button("Download Registration Database"):
+                conn = sqlite3.connect("loan_data.db")
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM users")
+                user_data = cursor.fetchall()
+                df_users = pd.DataFrame(user_data, columns=["ID", "Phone Number", "Password"])
+
+                st.write(df_users)
+                conn.close()
+
+            if st.button("Download Prediction Database"):
+                conn = sqlite3.connect("loan_data.db")
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM loan_predictions")
+                prediction_data = cursor.fetchall()
+                df_predictions = pd.DataFrame(prediction_data, columns=["ID", "Customer Name", "Gender", "Married", "Dependents", "Self Employed", "Loan Amount", "Property Area", "Credit History", "Education", "Applicant Income", "Coapplicant Income", "Loan Amount Term", "Result"])
+
+                st.write(df_predictions)
+                conn.close()
+
+        st.header("Loan Prediction Form")
         Customer_Name = st.text_input("Customer Name")
         Gender = st.selectbox("Gender", ("Male", "Female"))
         Married = st.selectbox("Married", ("Yes", "No"))
@@ -281,33 +315,13 @@ def main():
                 st.success(f"Prediction: **{result}**")
                 st.write("Probabilities (Rejected: 0, Approved: 1):", probabilities)
 
-                explanation_text, suggestions, shap_plot = explain_prediction(processed_input, result)
+                explanation_text, shap_plot = explain_prediction(processed_input, result)
                 st.markdown(explanation_text)
                 st.pyplot(shap_plot)
 
-                # Display text generation output
-                if result == "Rejected":
-                    st.markdown("### Suggestions for Improving Loan Approval Chances")
-                    st.write(suggestions)
-
-        st.divider()
         if st.button("Logout"):
             logout()
 
-        if st.session_state["role"] == "admin":
-            if st.button("Download Database"):
-                if os.path.exists("loan_data.db"):
-                    with open("loan_data.db", "rb") as f:
-                        st.download_button(
-                            label="Download SQLite Database",
-                            data=f,
-                            file_name="loan_data.db",
-                            mime="application/octet-stream"
-                        )
-                else:
-                    st.error("Database file not found.")
-        else:
-            st.info("Only admins can download the database.")
-
 if __name__ == "__main__":
     main()
+
